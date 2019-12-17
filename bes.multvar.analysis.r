@@ -10,21 +10,22 @@
 #Note that if you use a project (here 'BaltimoreStreamChem' the directory will be set to the project directory)
 # setwd("C:/Users/reisingera/Dropbox/Documents/R/Balt-ChemFingerprints")
 
-library(plyr)
+library(tidyverse)
 library(fmsb)
 library(car)
 library(vegan)
 library(animation)
+library(viridis)
 
 #Do some data cleanup from the rawdata emailed by Lisa on 13 Dec 2019 (data from 15-Oct-98 through 7-Jun-19):
 bes.waterchem.raw<-read.csv(file="BESFullWaterChemRaw.csv", header=T)
 
-bes.waterchem.working<-bes.waterchem.raw[bes.waterchem.raw$site=='GFCP'|bes.waterchem.raw$site=='GFVN'|bes.waterchem.raw$site=='GFGB'|bes.waterchem.raw$site=='GFGL'|
-    bes.waterchem.raw$site=='DRKR'|bes.waterchem.raw$site=='POBR'|bes.waterchem.raw$site=='BARN'|bes.waterchem.raw$site=='MCDN',]
+bes.waterchem.working<-bes.waterchem.raw[bes.waterchem.raw$Site=='GFCP'|bes.waterchem.raw$Site=='GFVN'|bes.waterchem.raw$Site=='GFGB'|bes.waterchem.raw$Site=='GFGL'|
+    bes.waterchem.raw$Site=='DRKR'|bes.waterchem.raw$Site=='POBR'|bes.waterchem.raw$Site=='BARN'|bes.waterchem.raw$Site=='MCDN',]
 
-bes.waterchem.working<-bes.waterchem.working[,c(1:10,13:15)]
+bes.waterchem.working<-bes.waterchem.working[,c(1:11,13:15)]
 
-write.csv(bes.waterchem.working, file="bes.waterchem.csv")
+write.csv(bes.waterchem.working, file="bes.waterchem.csv",row.names = F)
 
 #Read in the working data
 lulc.data<-read.csv(file="beslulc.csv", header=T)#Updated BES LULC from Claire Welty (see email sent from Claire on 11 Jan 2017)
@@ -32,12 +33,18 @@ lulc.data<-read.csv(file="beslulc.csv", header=T)#Updated BES LULC from Claire W
 ### Look at the data and then clean up in excel
 waterchem.data<-read.csv(file="bes.waterchem.csv", header=T)
 
+# clean up obviously bad data points
+waterchem.clean<-waterchem.data
 
-#Make a dataframe with the maximum values from the entire range of sampling
-max<-as.numeric(apply(waterchem.data, 2, max, na.rm=T))
-max # looks like we have some bad data points for temp, do, and ph - will clean up in excel
+waterchem.clean <- waterchem.clean %>% mutate(temperature = replace(temperature, temperature > 100, NA)) #replace temperatures >100 with NA
+waterchem.clean <- waterchem.clean %>% mutate(pH = replace(pH, pH > 14 | pH <1, NA)) #replace pH greater than 14 or less than 1
+waterchem.clean <- waterchem.clean %>% mutate(dox = replace(dox, dox > 100, NA)) #replace dox greater than 100 or less than 1
+
+write.csv(waterchem.clean, file="bes.waterchem.clean.csv",row.names = F) #write out the clean data
+
 
 data<-read.csv(file="bes.waterchem.clean.csv", header=T)
+
 
 #add a water year column
 data$water.year<-rep(NA, length(data[,1]))
@@ -45,42 +52,48 @@ data$water.year<-rep(NA, length(data[,1]))
 #fill the water year. If the julian date is before 275 (Oct 2 I believe, or Oct 1 for leap year...probably could do this better but it works) then the 
 #water year for that row is the same as the actual year, if the julian date is >= 275 then the water year assigned is the next calendar year
 for(i in 1:length(data$water.year)){
-  if(data[i,3]<275){
-    data[i,14]=data[i,2]
+  if(data$Julian_Date[i]<275){
+    data$water.year[i]=data$Year[i]
   }
   else{
-    (data[i,14]=data[i,2]+1)
+    (data$water.year[i]=data$Year[i]+1)
   }
 }
 
-###Make a color pallette for 15 classes (15 years of data)
-colors<-c("gray20","gray40", "gray60", "gray80", rgb(19,149,186,maxColorValue=255),rgb(17,120,153,maxColorValue=255),rgb(17,120,153,maxColorValue=255),
-          rgb(15,91,120,maxColorValue=255),rgb(192,46,29,maxColorValue=255), rgb(217,78,31,maxColorValue=255), rgb(241,108,32,maxColorValue=255), 
-          rgb(239,139,44,maxColorValue=255),rgb(236,170,56,maxColorValue=255),rgb(235,200,68,maxColorValue=255),rgb(162,184,108,maxColorValue=255))
+###Make a color pallette for 20 classes (20 years of data)
+colors<-viridis(20)
+#colors<-c("gray20","gray40", "gray60", "gray80", rgb(19,149,186,maxColorValue=255),rgb(17,120,153,maxColorValue=255),rgb(17,120,153,maxColorValue=255),
+         # rgb(15,91,120,maxColorValue=255),rgb(192,46,29,maxColorValue=255), rgb(217,78,31,maxColorValue=255), rgb(241,108,32,maxColorValue=255), 
+         #  rgb(239,139,44,maxColorValue=255),rgb(236,170,56,maxColorValue=255),rgb(235,200,68,maxColorValue=255),rgb(162,184,108,maxColorValue=255))
 
 
 #calculate the mean, max, and mean for each variable of interest by water year and site
+summary.data<-data %>% 
+  group_by(water.year, Site) %>% 
+  summarize(        mean.Cl=mean(Cl, na.rm=T), max.Cl=max(Cl, na.rm=T), min.Cl=min(Cl, na.rm=T),
+                    mean.NO3=mean(NO3, na.rm=T), max.NO3=max(NO3, na.rm=T), min.NO3=min(NO3, na.rm=T),
+                    mean.PO4=mean(PO4, na.rm=T), max.PO4=max(PO4, na.rm=T), min.PO4=min(PO4, na.rm=T),
+                    mean.O4=mean(SO4, na.rm=T), max.SO4=max(SO4, na.rm=T), min.SO4=min(SO4, na.rm=T),
+                    mean.TN=mean(TN, na.rm=T), max.TN=max(TN, na.rm=T), min.TN=min(TN, na.rm=T),
+                    mean.TP=mean(TP, na.rm=T), max.TP=max(TP, na.rm=T), min.TP=min(TP, na.rm=T))
 
-summary.data<-ddply(data[,c(4:10,14)], .(water.year, site), summarize, 
-                    mean.chloride=mean(chloride, na.rm=T), max.chloride=max(chloride, na.rm=T), min.chloride=min(chloride, na.rm=T),
-                    mean.no3=mean(no3, na.rm=T), max.no3=max(no3, na.rm=T), min.no3=min(no3, na.rm=T),
-                    mean.po4=mean(po4, na.rm=T), max.po4=max(po4, na.rm=T), min.po4=min(po4, na.rm=T),
-                    mean.so4=mean(so4, na.rm=T), max.so4=max(so4, na.rm=T), min.so4=min(so4, na.rm=T),
-                    mean.tn=mean(tn, na.rm=T), max.tn=max(tn, na.rm=T), min.tn=min(tn, na.rm=T),
-                    mean.tp=mean(tp, na.rm=T), max.tp=max(tp, na.rm=T), min.tp=min(tp, na.rm=T))
-#Remove 1999 and 2015 from the records as we don't have a full record of those years
-summary.data<-summary.data[summary.data$water.year!=1999&summary.data$water.year!=2015,]
+#Remove 1999 and 2019 from the records as we don't have a full record of those years
+summary.data<-summary.data[summary.data$water.year!=1999 & summary.data$water.year!=2019,]
 
-range.data<-ddply(data[,c(4:10,14)], .(water.year, site), summarize,
-                  chloride.range<-max(chloride, na.rm=T)-min(chloride, na.rm=T),
-                  no3.range<-max(no3, na.rm=T)-min(no3, na.rm=T),
-                  po4.range<-max(po4, na.rm=T)-min(po4, na.rm=T),
-                  so4.range<-max(so4, na.rm=T)-min(so4, na.rm=T),
-                  tn.range<-max(tn, na.rm=T)-min(tn, na.rm=T),
-                  tp.range<-max(tp, na.rm=T)-min(tp, na.rm=T))
-range.data<-range.data[range.data$water.year!=1999&range.data$water.year!=2015,]
+range.data<-data %>% 
+  group_by(water.year, Site) %>% 
+  summarize(        chloride.range<-max(Cl, na.rm=T) - min(Cl, na.rm=T),
+                    NO3.range<-max(NO3, na.rm=T)-min(NO3, na.rm=T),
+                    PO4.range<-max(PO4, na.rm=T)-min(PO4, na.rm=T),
+                    SO4.range<-max(SO4, na.rm=T)-min(SO4, na.rm=T),
+                    TN.range<-max(TN, na.rm=T)-min(TN, na.rm=T),
+                    TP.range<-max(TP, na.rm=T)-min(TP, na.rm=T))
+ 
+range.data<-range.data[range.data$water.year!=1999&range.data$water.year!=2019,]
 
-colnames(range.data)<-c("water.year", "site", "chloride", "no3", "po4", "so4", "tn", "tp")
+colnames(range.data)<-c("water.year", "Site", "Cl", "NO3", "PO4", "SO4", "TN", "TP")
+
+
 
 #Make radar charts showing the annual mean values for each site:
 windows(height=3, width=6)
