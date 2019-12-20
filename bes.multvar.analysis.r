@@ -158,10 +158,15 @@ BESflow<-readNWISdv(siteNumbers = USGS.site.nos$siteNumber,parameterCd = '00060'
 
 
 
-#################################################
-###              New Ordinations              ###
-#################################################
+####################################################
+###              Annual Ordinations              ###
+####################################################
 
+# Plan:
+# Run PCAs for the following annual summaries of BES stream chem: annual mean, annual range, annual min, annual max, annual C-Q slope, annual CV of chem:annual CV of flow
+# plot each of these using viridis color ramp to differentiate among years (show progression through time, maybe add arrows between successive years?)
+# Perhaps also run PCAs for all the points within each site, and compare hull areas or centroids for each year to get a sense of how sampling "snapshots" of water chem are changing
+# think about how to compare reactive and conservative solutes (CV ratio?)
 
 
 
