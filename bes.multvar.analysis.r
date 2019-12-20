@@ -3,8 +3,7 @@
 ### Created on 19 June 2017
 ### Last edited by: MLF
 ### Last edited on: 17 December 2019
-### Last edits: Revised how we calculate means, max and mins using ddply, made radar charts, ran PCAs, made figures to put into powerpoint for Peter and Emma
-### Next steps: 
+### Last edits: Updated calculattions for new data (WY2000-WY2018), automated removal of bad data points, updated to dplyr functions, added download of NWIS data
 
 #First set your working directory - this should be changed to reflect wherever you have saved the .csv files
 #Note that if you use a project (here 'BaltimoreStreamChem' the directory will be set to the project directory)
@@ -16,8 +15,9 @@ library(car)
 library(vegan)
 library(animation)
 library(viridis)
+library(dataRetrieval)
 
-#Do some data cleanup from the rawdata emailed by Lisa on 13 Dec 2019 (data from 15-Oct-98 through 7-Jun-19):
+#### Do some data cleanup from the rawdata emailed by Lisa on 13 Dec 2019 (data from 15-Oct-98 through 7-Jun-19):
 bes.waterchem.raw<-read.csv(file="BESFullWaterChemRaw.csv", header=T)
 
 bes.waterchem.working<-bes.waterchem.raw[bes.waterchem.raw$Site=='GFCP'|bes.waterchem.raw$Site=='GFVN'|bes.waterchem.raw$Site=='GFGB'|bes.waterchem.raw$Site=='GFGL'|
@@ -27,13 +27,10 @@ bes.waterchem.working<-bes.waterchem.working[,c(1:11,13:15)]
 
 write.csv(bes.waterchem.working, file="bes.waterchem.csv",row.names = F)
 
-#Read in the working data
-lulc.data<-read.csv(file="beslulc.csv", header=T)#Updated BES LULC from Claire Welty (see email sent from Claire on 11 Jan 2017)
-
-### Look at the data and then clean up in excel
+### Load working data 
 waterchem.data<-read.csv(file="bes.waterchem.csv", header=T)
 
-# clean up obviously bad data points
+### clean up obviously bad data points
 waterchem.clean<-waterchem.data
 
 waterchem.clean <- waterchem.clean %>% mutate(temperature = replace(temperature, temperature > 100, NA)) #replace temperatures >100 with NA
@@ -42,6 +39,10 @@ waterchem.clean <- waterchem.clean %>% mutate(dox = replace(dox, dox > 100, NA))
 
 write.csv(waterchem.clean, file="bes.waterchem.clean.csv",row.names = F) #write out the clean data
 
+
+
+#Read in the clean working data for analysis
+lulc.data<-read.csv(file="beslulc.csv", header=T)#Updated BES LULC from Claire Welty (see email sent from Claire on 11 Jan 2017)
 
 data<-read.csv(file="bes.waterchem.clean.csv", header=T)
 
@@ -61,7 +62,7 @@ for(i in 1:length(data$water.year)){
 }
 
 ###Make a color pallette for 20 classes (20 years of data)
-colors<-viridis(20)
+colors<-viridis(19)
 #colors<-c("gray20","gray40", "gray60", "gray80", rgb(19,149,186,maxColorValue=255),rgb(17,120,153,maxColorValue=255),rgb(17,120,153,maxColorValue=255),
          # rgb(15,91,120,maxColorValue=255),rgb(192,46,29,maxColorValue=255), rgb(217,78,31,maxColorValue=255), rgb(241,108,32,maxColorValue=255), 
          #  rgb(239,139,44,maxColorValue=255),rgb(236,170,56,maxColorValue=255),rgb(235,200,68,maxColorValue=255),rgb(162,184,108,maxColorValue=255))
@@ -73,7 +74,7 @@ summary.data<-data %>%
   summarize(        mean.Cl=mean(Cl, na.rm=T), max.Cl=max(Cl, na.rm=T), min.Cl=min(Cl, na.rm=T),
                     mean.NO3=mean(NO3, na.rm=T), max.NO3=max(NO3, na.rm=T), min.NO3=min(NO3, na.rm=T),
                     mean.PO4=mean(PO4, na.rm=T), max.PO4=max(PO4, na.rm=T), min.PO4=min(PO4, na.rm=T),
-                    mean.O4=mean(SO4, na.rm=T), max.SO4=max(SO4, na.rm=T), min.SO4=min(SO4, na.rm=T),
+                    mean.SO4=mean(SO4, na.rm=T), max.SO4=max(SO4, na.rm=T), min.SO4=min(SO4, na.rm=T),
                     mean.TN=mean(TN, na.rm=T), max.TN=max(TN, na.rm=T), min.TN=min(TN, na.rm=T),
                     mean.TP=mean(TP, na.rm=T), max.TP=max(TP, na.rm=T), min.TP=min(TP, na.rm=T))
 
@@ -99,35 +100,35 @@ colnames(range.data)<-c("water.year", "Site", "Cl", "NO3", "PO4", "SO4", "TN", "
 windows(height=3, width=6)
 par(mfrow=c(2,4), mar=c(0.6,1,0.6,1))
 radarchart(rbind(apply(summary.data[,c(3,6,9,12,15,18)], 2, max, na.rm=T), apply(summary.data[,c(3,6,9,12,15,18)], 2, min, na.rm=T), 
-                  summary.data[summary.data$site=='POBR',c(3,6,9,12,15,18)]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
-                  plwd=2, pty=16, cglcol='gray20', maxmin=T, vlabels=c(expression(paste("Cl"^" -")), expression(paste("NO"[3]^" -")), 
+                  summary.data[summary.data$Site=='POBR',c(3,6,9,12,15,18)]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
+                  plwd=2, pty=16,cglcol='gray20', maxmin=T, vlabels=c(expression(paste("Cl"^" -")), expression(paste("NO"[3]^" -")), 
                   expression(paste("PO"[4]^" 3-")), expression(paste("SO"[4]^" 2-")), "TN", "TP"), pcol=colors, title='POBR')
 radarchart(rbind(apply(summary.data[,c(3,6,9,12,15,18)], 2, max, na.rm=T), apply(summary.data[,c(3,6,9,12,15,18)], 2, min, na.rm=T), 
-                  summary.data[summary.data$site=='BARN',c(3,6,9,12,15,18)]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
+                  summary.data[summary.data$Site=='BARN',c(3,6,9,12,15,18)]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
                   plwd=2, pty=16, cglcol='gray20', maxmin=T, vlabels=c(expression(paste("Cl"^" -")), expression(paste("NO"[3]^" -")), 
                   expression(paste("PO"[4]^" 3-")), expression(paste("SO"[4]^" 2-")), "TN", "TP"), pcol=colors, title='BARN')
 radarchart(rbind(apply(summary.data[,c(3,6,9,12,15,18)], 2, max, na.rm=T), apply(summary.data[,c(3,6,9,12,15,18)], 2, min, na.rm=T), 
-                  summary.data[summary.data$site=='MCDN',c(3,6,9,12,15,18)]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
+                  summary.data[summary.data$Site=='MCDN',c(3,6,9,12,15,18)]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
                   plwd=2, pty=16, cglcol='gray20', maxmin=T, vlabels=c(expression(paste("Cl"^" -")), expression(paste("NO"[3]^" -")), 
                   expression(paste("PO"[4]^" 3-")), expression(paste("SO"[4]^" 2-")), "TN", "TP"), pcol=colors, title='MCDN')
 radarchart(rbind(apply(summary.data[,c(3,6,9,12,15,18)], 2, max, na.rm=T), apply(summary.data[,c(3,6,9,12,15,18)], 2, min, na.rm=T), 
-                  summary.data[summary.data$site=='DRKR',c(3,6,9,12,15,18)]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
+                  summary.data[summary.data$Site=='DRKR',c(3,6,9,12,15,18)]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
                   plwd=2, pty=16, cglcol='gray20', maxmin=T, vlabels=c(expression(paste("Cl"^" -")), expression(paste("NO"[3]^" -")), 
                   expression(paste("PO"[4]^" 3-")), expression(paste("SO"[4]^" 2-")), "TN", "TP"), pcol=colors, title='DRKR')
 radarchart(rbind(apply(summary.data[,c(3,6,9,12,15,18)], 2, max, na.rm=T), apply(summary.data[,c(3,6,9,12,15,18)], 2, min, na.rm=T), 
-                  summary.data[summary.data$site=='GFGL',c(3,6,9,12,15,18)]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
+                  summary.data[summary.data$Site=='GFGL',c(3,6,9,12,15,18)]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
                   plwd=2, pty=16, cglcol='gray20', maxmin=T, vlabels=c(expression(paste("Cl"^" -")), expression(paste("NO"[3]^" -")), 
                   expression(paste("PO"[4]^" 3-")), expression(paste("SO"[4]^" 2-")), "TN", "TP"), pcol=colors, title='GFGL')
 radarchart(rbind(apply(summary.data[,c(3,6,9,12,15,18)], 2, max, na.rm=T), apply(summary.data[,c(3,6,9,12,15,18)], 2, min, na.rm=T), 
-                  summary.data[summary.data$site=='GFGB',c(3,6,9,12,15,18)]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
+                  summary.data[summary.data$Site=='GFGB',c(3,6,9,12,15,18)]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
                   plwd=2, pty=16, cglcol='gray20', maxmin=T, vlabels=c(expression(paste("Cl"^" -")), expression(paste("NO"[3]^" -")), 
                   expression(paste("PO"[4]^" 3-")), expression(paste("SO"[4]^" 2-")), "TN", "TP"), pcol=colors, title='GFGB')
 radarchart(rbind(apply(summary.data[,c(3,6,9,12,15,18)], 2, max, na.rm=T), apply(summary.data[,c(3,6,9,12,15,18)], 2, min, na.rm=T), 
-                  summary.data[summary.data$site=='GFVN',c(3,6,9,12,15,18)]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
+                  summary.data[summary.data$Site=='GFVN',c(3,6,9,12,15,18)]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
                   plwd=2, pty=16, cglcol='gray20', maxmin=T, vlabels=c(expression(paste("Cl"^" -")), expression(paste("NO"[3]^" -")), 
                   expression(paste("PO"[4]^" 3-")), expression(paste("SO"[4]^" 2-")), "TN", "TP"), pcol=colors, title='GFVN')
 radarchart(rbind(apply(summary.data[,c(3,6,9,12,15,18)], 2, max, na.rm=T), apply(summary.data[,c(3,6,9,12,15,18)], 2, min, na.rm=T), 
-                 summary.data[summary.data$site=='GFCP',c(3,6,9,12,15,18)]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
+                 summary.data[summary.data$Site=='GFCP',c(3,6,9,12,15,18)]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
                     plwd=2, pty=16, cglcol='gray20', maxmin=T, vlabels=c(expression(paste("Cl"^" -")), expression(paste("NO"[3]^" -")), 
                     expression(paste("PO"[4]^" 3-")), expression(paste("SO"[4]^" 2-")), "TN", "TP"), pcol=colors, title='GFCP')
 
@@ -135,15 +136,54 @@ means<-summary.data[,c(1:3,6,9,12,15,18)]
 
 means.lulc<-merge(means, lulc.data)
 
+##############################################
+###      Download NWIS discharge data      ###
+##############################################
 
-windows()
+USGS.site.nos<-data.frame(matrix(c(
+  "POBR",'01583570',
+  "BARN",'01583580',
+  "GFGB",'01589197',
+  "GFVN",'01589300',
+  "GFCP",'01589352',
+  "DRKR",'01589330',
+  "GFGL",'01589180'),ncol=2,byrow=T))
+colnames(USGS.site.nos)<-c("siteName","siteNumber")
+Q.start<-"1998-10-01"
+Q.end<-"2019-09-30"
+
+
+BESflow<-readNWISdv(siteNumbers = USGS.site.nos$siteNumber,parameterCd = '00060',startDate = Q.start,endDate = Q.end)
+
+
+
+
+#############################################
+###              Ordinations              ###
+#############################################
+
+
+
+
+
+
+
+
+
+
+
+
+################################
+###   AJ's ordination code   ###
+################################
+
+### Ordination on annual means
 
 mean.pca<-rda(means.lulc[,3:8], scale=T)
 summary(mean.pca)
 permanova.mean<-adonis2(means.lulc[,3:8]~means.lulc$water.year*means.lulc$site)
 permanova.mean
 mean.pca.scores<-scores(mean.pca)
-
 
 
 # Make a PCA plot
@@ -288,35 +328,35 @@ mean.permanova<-adonis2(summary.data[,c(3,6,9,12,15,18)]~summary.data$site*summa
 windows(height=4, width=6)
 par(mfrow=c(2,4), mar=c(1,1,1,1))
 radarchart(rbind(apply(range.data[,3:8], 2, max, na.rm=T), apply(range.data[,3:8], 2, min, na.rm=T), 
-                 range.data[range.data$site=='POBR',3:8]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
+                 range.data[range.data$Site=='POBR',3:8]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
            plwd=2, pty=16, cglcol='gray20', maxmin=T, vlabels=c(expression(paste("Cl"^" -")), expression(paste("NO"[3]^" -")), 
                                                                 expression(paste("PO"[4]^" 3-")), expression(paste("SO"[4]^" 2-")), "TN", "TP"), pcol=colors)
 radarchart(rbind(apply(range.data[,3:8], 2, max, na.rm=T), apply(range.data[,3:8], 2, min, na.rm=T), 
-                 range.data[range.data$site=='BARN',3:8]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
+                 range.data[range.data$Site=='BARN',3:8]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
            plwd=2, pty=16, cglcol='gray20', maxmin=T, vlabels=c(expression(paste("Cl"^" -")), expression(paste("NO"[3]^" -")), 
                                                                 expression(paste("PO"[4]^" 3-")), expression(paste("SO"[4]^" 2-")), "TN", "TP"), pcol=colors)
 radarchart(rbind(apply(range.data[,3:8], 2, max, na.rm=T), apply(range.data[,3:8], 2, min, na.rm=T), 
-                 range.data[range.data$site=='MCDN',3:8]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
+                 range.data[range.data$Site=='MCDN',3:8]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
            plwd=2, pty=16, cglcol='gray20', maxmin=T, vlabels=c(expression(paste("Cl"^" -")), expression(paste("NO"[3]^" -")), 
                                                                 expression(paste("PO"[4]^" 3-")), expression(paste("SO"[4]^" 2-")), "TN", "TP"), pcol=colors)
 radarchart(rbind(apply(range.data[,3:8], 2, max, na.rm=T), apply(range.data[,3:8], 2, min, na.rm=T), 
-                 range.data[range.data$site=='DRKR',3:8]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
+                 range.data[range.data$Site=='DRKR',3:8]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
            plwd=2, pty=16, cglcol='gray20', maxmin=T, vlabels=c(expression(paste("Cl"^" -")), expression(paste("NO"[3]^" -")), 
                                                                 expression(paste("PO"[4]^" 3-")), expression(paste("SO"[4]^" 2-")), "TN", "TP"), pcol=colors)
 radarchart(rbind(apply(range.data[,3:8], 2, max, na.rm=T), apply(range.data[,3:8], 2, min, na.rm=T), 
-                 range.data[range.data$site=='GFGL',3:8]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
+                 range.data[range.data$Site=='GFGL',3:8]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
            plwd=2, pty=16, cglcol='gray20', maxmin=T, vlabels=c(expression(paste("Cl"^" -")), expression(paste("NO"[3]^" -")), 
                                                                 expression(paste("PO"[4]^" 3-")), expression(paste("SO"[4]^" 2-")), "TN", "TP"), pcol=colors)
 radarchart(rbind(apply(range.data[,3:8], 2, max, na.rm=T), apply(range.data[,3:8], 2, min, na.rm=T), 
-                 range.data[range.data$site=='GFGB',3:8]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
+                 range.data[range.data$Site=='GFGB',3:8]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
            plwd=2, pty=16, cglcol='gray20', maxmin=T, vlabels=c(expression(paste("Cl"^" -")), expression(paste("NO"[3]^" -")), 
                                                                 expression(paste("PO"[4]^" 3-")), expression(paste("SO"[4]^" 2-")), "TN", "TP"), pcol=colors)
 radarchart(rbind(apply(range.data[,3:8], 2, max, na.rm=T), apply(range.data[,3:8], 2, min, na.rm=T), 
-                 range.data[range.data$site=='GFVN',3:8]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
+                 range.data[range.data$Site=='GFVN',3:8]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
            plwd=2, pty=16, cglcol='gray20', maxmin=T, vlabels=c(expression(paste("Cl"^" -")), expression(paste("NO"[3]^" -")), 
                                                                 expression(paste("PO"[4]^" 3-")), expression(paste("SO"[4]^" 2-")), "TN", "TP"), pcol=colors)
 radarchart(rbind(apply(range.data[,3:8], 2, max, na.rm=T), apply(range.data[,3:8], 2, min, na.rm=T), 
-                 range.data[range.data$site=='GFCP',3:8]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
+                 range.data[range.data$Site=='GFCP',3:8]), axistype=0, axislabcol='gray20', palcex=1.2, vlcex=1, plty=1, 
            plwd=2, pty=16, cglcol='gray20', maxmin=T, vlabels=c(expression(paste("Cl"^" -")), expression(paste("NO"[3]^" -")), 
                                                                 expression(paste("PO"[4]^" 3-")), expression(paste("SO"[4]^" 2-")), "TN", "TP"), pcol=colors)
 
