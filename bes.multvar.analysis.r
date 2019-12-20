@@ -134,7 +134,7 @@ radarchart(rbind(apply(summary.data[,c(3,6,9,12,15,18)], 2, max, na.rm=T), apply
 
 means<-summary.data[,c(1:3,6,9,12,15,18)]
 
-means.lulc<-merge(means, lulc.data)
+means.lulc<-left_join(means,lulc.data,by=c("Site"="site"))
 
 ##############################################
 ###      Download NWIS discharge data      ###
@@ -171,6 +171,243 @@ BESflow<-readNWISdv(siteNumbers = USGS.site.nos$siteNumber,parameterCd = '00060'
 ####################################################
 
 ### 1. Annual means 
+mean.pca<-rda(means.lulc[,3:8], scale=T)
+# PC1 explains 56.45% of the variation, PC2 explains 31.06% of the variation
+
+scores.mean<-scores(mean.pca,scaling=2)
+
+## Biplot
+
+# png("FIGURES/PCAonAnnualMeans",height=5,width=5,units='in',res=300)
+par(mar=c(3,3,0.2,0.2))
+par(mgp=c(1.5,0.4,0))
+plot(mean.pca,xlab="PC 1 (56.5%)",ylab="PC 2 (31.1%)",type="n",axes=F,xlim=c(-2.5,2.5),ylim=c(-2.5,2.5))
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+
+
+arrows(0,0,scores.mean$species[,1],scores.mean$species[,2],length=0.1,angle=30)
+Nudge<-1.1
+text(scores.mean$species[,1]*Nudge,scores.mean$species[,2]*Nudge,rownames(scores.mean$species),cex=0.8,font=2)
+
+
+
+### Fit Initial DOC concentration and proportional DOC loss to the PCA as environmental variables ###
+#First, make a dataframe for the DOC variables
+DOC.info<-cbind(paste0(bio$Sample.location,'_',bio$Experiment),bio[,c(6,8:11)])
+colnames(DOC.info)<-c('name_season',colnames(bio[,c(6,8:11)]))
+
+foo<-as.data.frame(paste0(bio.points.ordered[,2],'_',bio.points.ordered[,5]))
+colnames(foo)<-'name_season'
+DOC.env<-merge(DOC.info,foo,by="name_season")
+#Standardize the data:
+sdzd.DOC.env<-matrix(nrow=nrow(DOC.env),ncol=ncol(DOC.env))
+for (i in 2:ncol(DOC.env)){
+  sdzd.DOC.env[,i]<-(DOC.env[,i]-mean(DOC.env[,i]))/sd(DOC.env[,i])
+}
+sdzd.DOC.env[,1]<-DOC.env[,1]
+
+DOC.fit<-envfit(pca2,sdzd.DOC.env[,2:6])
+
+scores.2<-scores(pca2,scaling=2)
+rownames(scores.2$species)<-colnames(bio.pca2)
+foo<-scores(pca2,display="species",scaling=2)
+DOC.scores<-scores(DOC.fit,"vectors",scaling=2) #this gives the scaled locations of the arrow heads
+
+
+# PCA plots
+
+### PANEL A: PCA Biplot with loadings ###
+
+png("D:/DISSERTATION/Urban Streams/BIOAVAILABILITY/BIOAVAIL FIGURES/ES&T figures/OM_PCA_Loadings.png",height=5,width=5,units='in',res=300)
+par(mar=c(3,3,0.2,0.2))
+par(mgp=c(1.5,0.4,0))
+plot(pca2,xlab="PC 1 (47.9%)",ylab="PC 2 (20.4%)",type="n",axes=F,xlim=c(-2.5,2.5),ylim=c(-2.5,2.5))
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+
+rownames(scores.2$species)<-c("C1","C2","C3","HIX","BIX","SUVA","FI")
+
+arrows(0,0,scores.2$species[,1],scores.2$species[,2],length=0.1,angle=30)
+Nudge<-1.1
+text(scores.2$species[,1]*Nudge,scores.2$species[,2]*Nudge,rownames(scores.2$species),cex=0.8,font=2)
+
+
+#Add points based on their type (symbol) and incubation time (color)
+## "Stream Flows" = blue
+### Daylighted Upstream Channel = U
+points(scores.2$sites[c(88,94,184,190),1],scores.2$sites[c(88,94,184,190),2],cex=0.9,pch=16,col="#3182bd")
+points(scores.2$sites[c(89,95,185,191),1],scores.2$sites[c(89,95,185,191),2],cex=0.9,pch=16,col="#9ecae1")
+points(scores.2$sites[c(90,96,186,192),1],scores.2$sites[c(90,96,186,192),2],cex=0.9,pch=16,col="#deebf7")
+### ISCO storm samples = S
+points(scores.2$sites[c(34,37,40,43,46,49,52,55,58,97,136,139,142,145,148,151,154,157,160,163),1],scores.2$sites[c(34,37,40,43,46,49,52,55,58,97,136,139,142,145,148,151,154,157,160,163),2],cex=0.9,pch=16,col="#3182bd")
+points(scores.2$sites[c(35,38,41,44,47,50,53,56,59,98,137,140,143,146,149,152,155,158,161,164),1],scores.2$sites[c(35,38,41,44,47,50,53,56,59,98,137,140,143,146,149,152,155,158,161,164),2],cex=0.9,pch=16,col="#9ecae1")
+points(scores.2$sites[c(36,39,42,45,48,51,54,57,60,99,138,141,144,147,150,153,156,159,162,165),1],scores.2$sites[c(6,39,42,45,48,51,54,57,60,99,138,141,144,147,150,153,156,159,162,165),2],cex=0.9,pch=16,col="#deebf7")
+
+## "Primary sources" = brown
+### Biofilm = b
+points(scores.2$sites[c(97),1],scores.2$sites[c(97),2],cex=0.9,pch=16,col="#bc5200")
+points(scores.2$sites[c(98),1],scores.2$sites[c(98),2],cex=0.9,pch=16,col="#e5a067")
+points(scores.2$sites[c(99),1],scores.2$sites[c(99),2],cex=0.9,pch=16,col="#fce2cc")
+### Grass = g
+points(scores.2$sites[115,1],scores.2$sites[115,2],cex=0.9,pch=16,col="#bc5200")
+points(scores.2$sites[116,1],scores.2$sites[116,2],cex=0.9,pch=16,col="#e5a067")
+points(scores.2$sites[117,1],scores.2$sites[117,2],cex=0.9,pch=16,col="#fce2cc")
+### Leaf (green, senesced, pine needles) = l
+points(scores.2$sites[c(61,67,118),1],scores.2$sites[c(61,67,118),2],cex=0.9,pch=16,col="#bc5200")
+points(scores.2$sites[c(62,68,119),1],scores.2$sites[c(62,68,119),2],cex=0.9,pch=16,col="#e5a067")
+points(scores.2$sites[c(63,69,120),1],scores.2$sites[c(63,69,120),2],cex=0.9,pch=16,col="#fce2cc")
+### Soil = s
+points(scores.2$sites[85,1],scores.2$sites[85,2],cex=0.9,pch=16,col="#bc5200")
+points(scores.2$sites[86,1],scores.2$sites[86,2],cex=0.9,pch=16,col="#e5a067")
+points(scores.2$sites[87,1],scores.2$sites[87,2],cex=0.9,pch=16,col="#fce2cc")
+### Mulch = m
+points(scores.2$sites[64,1],scores.2$sites[64,2],cex=0.9,pch=16,col="#bc5200")
+points(scores.2$sites[65,1],scores.2$sites[65,2],cex=0.9,pch=16,col="#e5a067")
+points(scores.2$sites[66,1],scores.2$sites[66,2],cex=0.9,pch=16,col="#fce2cc")
+
+## "Leachates" = brown
+### CB = C
+points(scores.2$sites[c(7,10,13,16,103,106,109,112),1],scores.2$sites[c(7,10,13,16,103,106,109,112),2],cex=0.9,pch=16,col="#bc5200")
+points(scores.2$sites[c(8,11,14,17,104,107,110,113),1],scores.2$sites[c(8,11,14,17,104,107,110,113),2],cex=0.9,pch=16,col="#e5a067")
+points(scores.2$sites[c(9,12,15,18,105,108,111,114),1],scores.2$sites[c(9,12,15,18,105,108,111,114),2],cex=0.9,pch=16,col="#fce2cc")
+### gutter = G
+points(scores.2$sites[c(28,31,130,133),1],scores.2$sites[c(28,31,130,133),2],cex=0.9,pch=16,col="#bc5200")
+points(scores.2$sites[c(29,32,131,134),1],scores.2$sites[c(29,32,131,134),2],cex=0.9,pch=16,col="#e5a067")
+points(scores.2$sites[c(30,33,132,135),1],scores.2$sites[c(30,33,132,135),2],cex=0.9,pch=16,col="#fce2cc")
+
+## "Engineered Headwater Flows" = blue
+### CB = C
+points(scores.2$sites[c(1,4),1],scores.2$sites[c(1,4),2],cex=0.9,pch=16,col="#3182bd")
+points(scores.2$sites[c(2,5),1],scores.2$sites[c(2,5),2],cex=0.9,pch=16,col="#9ecae1")
+points(scores.2$sites[c(3,6),1],scores.2$sites[c(3,6),2],cex=0.9,pch=16,col="#deebf7")
+### gutter = G
+points(scores.2$sites[c(19,22,25,121,124,127),1],scores.2$sites[c(19,22,25,121,124,127),2],cex=0.9,pch=16,col="#3182bd")
+points(scores.2$sites[c(20,23,26,122,125,128),1],scores.2$sites[c(20,23,26,122,125,128),2],cex=0.9,pch=16,col="#9ecae1")
+points(scores.2$sites[c(21,24,27,123,126,129),1],scores.2$sites[c(21,24,27,123,126,129),2],cex=0.9,pch=16,col="#deebf7")
+### Road runoff = R
+points(scores.2$sites[c(70,73,76,166,169,172),1],scores.2$sites[c(70,73,76,166,169,172),2],cex=0.9,pch=16,col="#3182bd")
+points(scores.2$sites[c(71,74,77,167,170,173),1],scores.2$sites[c(71,74,77,167,170,173),2],cex=0.9,pch=16,col="#9ecae1")
+points(scores.2$sites[c(72,75,78,168,171,174),1],scores.2$sites[c(72,75,78,168,171,174),2],cex=0.9,pch=16,col="#deebf7")
+### Storm Drain = D
+points(scores.2$sites[c(79,82,175,178,181),1],scores.2$sites[c(79,82,175,178,181),2],cex=0.9,pch=16,col="#3182bd")
+points(scores.2$sites[c(80,83,176,179,182),1],scores.2$sites[c(80,83,176,179,182),2],cex=0.9,pch=16,col="#9ecae1")
+points(scores.2$sites[c(81,84,177,180,183),1],scores.2$sites[c(81,84,177,180,183),2],cex=0.9,pch=16,col="#deebf7")
+
+rownames(DOC.scores)<-c("Initial [DOC]","Initial DOC Mass Loss","Initial Proportion DOC Lost","Total DOC Mass Loss","Total Proportion DOC Lost")
+arrows(0,0,DOC.scores[c(1,5),1],DOC.scores[c(1,5),2],length = 0.07,angle=30,col="gray50",lwd=2)
+text(c(0.5,-0.6),c(0.25,-0.21),c("Proportion DOC Lost","Initial [DOC]"),col="gray50",cex=0.7)
+
+dev.off()
+
+#####################################
+#  Panel B - trajectories 0-6  days #
+#####################################
+png("D:/DISSERTATION/Urban Streams/BIOAVAILABILITY/BIOAVAIL FIGURES/ES&T figures/OM.PCA.BiplotTrajectories0.6.png",height=5,width=5,units='in',res=300)
+
+par(mar=c(3,3,0.2,0.2))
+par(mgp=c(1.5,0.4,0))
+plot(scores.2$sites[,1],scores.2$sites[,2],xlab="PC 1 (47.9%)",ylab="PC 2 (20.4%)",type="n",axes=F,xlim=c(-2,1))
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+
+#Add points based on their type (symbol) and incubation time (color)
+## "Stream Flows" = blue
+### Daylighted Upstream Channel = U
+points(scores.2$sites[c(88,94,184,190),1],scores.2$sites[c(88,94,184,190),2],cex=0.9,pch=16,col="#3182bd")
+points(scores.2$sites[c(89,95,185,191),1],scores.2$sites[c(89,95,185,191),2],cex=0.9,pch=16,col="#9ecae1")
+points(scores.2$sites[c(90,96,186,192),1],scores.2$sites[c(90,96,186,192),2],cex=0.9,pch=16,col="#deebf7")
+### ISCO storm samples = S
+points(scores.2$sites[c(34,37,40,43,46,49,52,55,58,97,136,139,142,145,148,151,154,157,160,163),1],scores.2$sites[c(34,37,40,43,46,49,52,55,58,97,136,139,142,145,148,151,154,157,160,163),2],cex=0.9,pch=16,col="#3182bd")
+points(scores.2$sites[c(35,38,41,44,47,50,53,56,59,98,137,140,143,146,149,152,155,158,161,164),1],scores.2$sites[c(35,38,41,44,47,50,53,56,59,98,137,140,143,146,149,152,155,158,161,164),2],cex=0.9,pch=16,col="#9ecae1")
+points(scores.2$sites[c(36,39,42,45,48,51,54,57,60,99,138,141,144,147,150,153,156,159,162,165),1],scores.2$sites[c(6,39,42,45,48,51,54,57,60,99,138,141,144,147,150,153,156,159,162,165),2],cex=0.9,pch=16,col="#deebf7")
+
+## "Primary sources" = brown
+### Biofilm = b
+points(scores.2$sites[c(97),1],scores.2$sites[c(97),2],cex=0.9,pch=16,col="#bc5200")
+points(scores.2$sites[c(98),1],scores.2$sites[c(98),2],cex=0.9,pch=16,col="#e5a067")
+points(scores.2$sites[c(99),1],scores.2$sites[c(99),2],cex=0.9,pch=16,col="#fce2cc")
+### Grass = g
+points(scores.2$sites[115,1],scores.2$sites[115,2],cex=0.9,pch=16,col="#bc5200")
+points(scores.2$sites[116,1],scores.2$sites[116,2],cex=0.9,pch=16,col="#e5a067")
+points(scores.2$sites[117,1],scores.2$sites[117,2],cex=0.9,pch=16,col="#fce2cc")
+### Leaf (green, senesced, pine needles) = l
+points(scores.2$sites[c(61,67,118),1],scores.2$sites[c(61,67,118),2],cex=0.9,pch=16,col="#bc5200")
+points(scores.2$sites[c(62,68,119),1],scores.2$sites[c(62,68,119),2],cex=0.9,pch=16,col="#e5a067")
+points(scores.2$sites[c(63,69,120),1],scores.2$sites[c(63,69,120),2],cex=0.9,pch=16,col="#fce2cc")
+### Soil = s
+points(scores.2$sites[85,1],scores.2$sites[85,2],cex=0.9,pch=16,col="#bc5200")
+points(scores.2$sites[86,1],scores.2$sites[86,2],cex=0.9,pch=16,col="#e5a067")
+points(scores.2$sites[87,1],scores.2$sites[87,2],cex=0.9,pch=16,col="#fce2cc")
+### Mulch = m
+points(scores.2$sites[64,1],scores.2$sites[64,2],cex=0.9,pch=16,col="#bc5200")
+points(scores.2$sites[65,1],scores.2$sites[65,2],cex=0.9,pch=16,col="#e5a067")
+points(scores.2$sites[66,1],scores.2$sites[66,2],cex=0.9,pch=16,col="#fce2cc")
+
+## "Leachates" = brown
+### CB = C
+points(scores.2$sites[c(7,10,13,16,103,106,109,112),1],scores.2$sites[c(7,10,13,16,103,106,109,112),2],cex=0.9,pch=16,col="#bc5200")
+points(scores.2$sites[c(8,11,14,17,104,107,110,113),1],scores.2$sites[c(8,11,14,17,104,107,110,113),2],cex=0.9,pch=16,col="#e5a067")
+points(scores.2$sites[c(9,12,15,18,105,108,111,114),1],scores.2$sites[c(9,12,15,18,105,108,111,114),2],cex=0.9,pch=16,col="#fce2cc")
+### gutter = G
+points(scores.2$sites[c(28,31,130,133),1],scores.2$sites[c(28,31,130,133),2],cex=0.9,pch=16,col="#bc5200")
+points(scores.2$sites[c(29,32,131,134),1],scores.2$sites[c(29,32,131,134),2],cex=0.9,pch=16,col="#e5a067")
+points(scores.2$sites[c(30,33,132,135),1],scores.2$sites[c(30,33,132,135),2],cex=0.9,pch=16,col="#fce2cc")
+
+## "Engineered Headwater Flows" = blue
+### CB = C
+points(scores.2$sites[c(1,4),1],scores.2$sites[c(1,4),2],cex=0.9,pch=16,col="#3182bd")
+points(scores.2$sites[c(2,5),1],scores.2$sites[c(2,5),2],cex=0.9,pch=16,col="#9ecae1")
+points(scores.2$sites[c(3,6),1],scores.2$sites[c(3,6),2],cex=0.9,pch=16,col="#deebf7")
+### gutter = G
+points(scores.2$sites[c(19,22,25,121,124,127),1],scores.2$sites[c(19,22,25,121,124,127),2],cex=0.9,pch=16,col="#3182bd")
+points(scores.2$sites[c(20,23,26,122,125,128),1],scores.2$sites[c(20,23,26,122,125,128),2],cex=0.9,pch=16,col="#9ecae1")
+points(scores.2$sites[c(21,24,27,123,126,129),1],scores.2$sites[c(21,24,27,123,126,129),2],cex=0.9,pch=16,col="#deebf7")
+### Road runoff = R
+points(scores.2$sites[c(70,73,76,166,169,172),1],scores.2$sites[c(70,73,76,166,169,172),2],cex=0.9,pch=16,col="#3182bd")
+points(scores.2$sites[c(71,74,77,167,170,173),1],scores.2$sites[c(71,74,77,167,170,173),2],cex=0.9,pch=16,col="#9ecae1")
+points(scores.2$sites[c(72,75,78,168,171,174),1],scores.2$sites[c(72,75,78,168,171,174),2],cex=0.9,pch=16,col="#deebf7")
+### Storm Drain = D
+points(scores.2$sites[c(79,82,175,178,181),1],scores.2$sites[c(79,82,175,178,181),2],cex=0.9,pch=16,col="#3182bd")
+points(scores.2$sites[c(80,83,176,179,182),1],scores.2$sites[c(80,83,176,179,182),2],cex=0.9,pch=16,col="#9ecae1")
+points(scores.2$sites[c(81,84,177,180,183),1],scores.2$sites[c(81,84,177,180,183),2],cex=0.9,pch=16,col="#deebf7")
+
+# arrows for stream flow
+for (i in 1:nrow(S.pca2)){
+  arrows(S.pca2[i,1],S.pca2[i,2],S.pca2[i,3],S.pca2[i,4],length=0.075,lwd=1,col="#3182bd")
+}
+# for (i in 1:nrow(S.pca2)){
+# arrows(S.pca2[i,3],S.pca2[i,4],S.pca2[i,5],S.pca2[i,6],length=0.075,lwd=1,col="#BB8FCE")
+# }
+
+# arrows for EH flow
+for (i in 1:nrow(EH.pca2)){
+  arrows(EH.pca2[i,1],EH.pca2[i,2],EH.pca2[i,3],EH.pca2[i,4],length=0.075,lwd=1,col="#3182bd")
+}
+# for (i in 1:nrow(EH.pca2)){
+# arrows(EH.pca2[i,3],EH.pca2[i,4],EH.pca2[i,5],EH.pca2[i,6],length=0.075,lwd=1,col="#ABB2B9")
+# }
+
+# arrows for EH leachates
+for (i in 1:nrow(L.pca2)){
+  arrows(L.pca2[i,1],L.pca2[i,2],L.pca2[i,3],L.pca2[i,4],length=0.075,lwd=1,col="#bc5200")
+}
+# for (i in 1:nrow(L.pca2)){
+# arrows(L.pca2[i,3],L.pca2[i,4],L.pca2[i,5],L.pca2[i,6],length=0.075,lwd=1,col="#E6B0AA")
+# }
+
+# arrows for primary source leachates
+for (i in 1:nrow(P.pca2)){
+  arrows(P.pca2[i,1],P.pca2[i,2],P.pca2[i,3],P.pca2[i,4],length=0.075,lwd=1,col="#bc5200")
+}
+# for (i in 1:nrow(P.pca2)){
+# arrows(P.pca2[i,3],P.pca2[i,4],P.pca2[i,5],P.pca2[i,6],length=0.075,lwd=1,col="#A9DFBF")
+# }
+
+dev.off()
 
 
 
