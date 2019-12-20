@@ -16,6 +16,7 @@ library(vegan)
 library(animation)
 library(viridis)
 library(dataRetrieval)
+library(plotrix)
 
 #### Do some data cleanup from the rawdata emailed by Lisa on 13 Dec 2019 (data from 15-Oct-98 through 7-Jun-19):
 bes.waterchem.raw<-read.csv(file="BESFullWaterChemRaw.csv", header=T)
@@ -169,34 +170,78 @@ BESflow<-readNWISdv(siteNumbers = USGS.site.nos$siteNumber,parameterCd = '00060'
 ####################################################
 ###              Annual Ordinations              ###
 ####################################################
+site.colors<-c('#1b9e77',
+               '#d95f02',
+               '#7570b3',
+               '#e7298a',
+               '#66a61e',
+               '#e6ab02',
+               '#a6761d',
+               '#666666')
+site.symbols<-c(3,16,25,15,24,18,1,4)
 
-### 1. Annual means 
+
+
+#### 1. Annual means 
 mean.pca<-rda(means.lulc[,3:8], scale=T)
 # PC1 explains 56.45% of the variation, PC2 explains 31.06% of the variation
 
 scores.mean<-scores(mean.pca)
+row.names(scores.mean$species)<-c("Cl","NO3","PO4","SO4","TN","TP")
 
-## Biplot
 
-# png("FIGURES/PCAonAnnualMeans",height=5,width=5,units='in',res=300)
+## Biplot A: site by color with loadings
+
+png("FIGURES/PCAonAnnualMeans_A.png",height=5,width=5,units='in',res=300)
 par(mar=c(3,3,0.2,0.2))
 par(mgp=c(1.5,0.4,0))
-plot(mean.pca,xlab="PC 1 (56.5%)",ylab="PC 2 (31.1%)",type="n",axes=F,xlim=c(-2.5,2.5),ylim=c(-2.5,2.5))
+plot(mean.pca,xlab="PC 1 (56.5%)",ylab="PC 2 (31.1%)",type="n",axes=F,xlim=c(-2.2,0.9),ylim=c(-2.2,0.9))
 axis(1,tck=0.02)
 axis(2,tck=0.02)
 box()
 
 arrows(0,0,scores.mean$species[,1],scores.mean$species[,2],length=0.1,angle=30)
-Nudge<-1.1
+Nudge<-1.05
 text(scores.mean$species[,1]*Nudge,scores.mean$species[,2]*Nudge,rownames(scores.mean$species),cex=0.8,font=2)
-
-# add points with site indicated by symbol and year by color
-site.symbols<-
   
-points(as.vector(scores.mean$sites[which(means.lulc$Site=="POBR"),1]),as.vector(scores.mean$sites[which(means.lulc$Site=="POBR"),2]),col="red")
+# add sites as colors
+
+for (i in 1:length(unique(means.lulc$Site))){
+points(as.vector(scores.mean$sites[which(means.lulc$Site==unique(means.lulc$Site)[i]),1]),as.vector(scores.mean$sites[which(means.lulc$Site==unique(means.lulc$Site)[i]),2]),col=site.colors[i])
+}
+legend('bottomleft',legend = unique(means.lulc$Site),col=site.colors,pch=1,pt.lwd=2)
+
+dev.off()
+
+
+## Biplot B: zoomed in with site by symbol and year by color
+
+png("FIGURES/PCAonAnnualMeans_B.png",height=5,width=5,units='in',res=300)
+par(mar=c(3,3,0.2,0.2))
+par(mgp=c(1.5,0.4,0))
+plot(mean.pca,xlab="PC 1 (56.5%)",ylab="PC 2 (31.1%)",type="n",axes=F,xlim=c(-1.5,0.6),ylim=c(-1.5,0.6))
+axis(1,tck=0.015)
+axis(2,tck=0.015)
+box()
+
+# add points with site indicated by symbol and year by color (viridis color palette for years is names "colors")
+
+for (i in 1:length(unique(means.lulc$Site))){
+  for (j in 1:length(unique(means.lulc$water.year))){
+    points(as.vector(scores.mean$sites[which(means.lulc$Site==unique(means.lulc$Site)[i]&means.lulc$water.year==unique(means.lulc$water.year)[j]),1]),as.vector(scores.mean$sites[which(means.lulc$Site==unique(means.lulc$Site)[i]&means.lulc$water.year==unique(means.lulc$water.year)[j]),2]),pch=site.symbols[i],col=colors[j],bg=colors[j])
+  }
+}
+
+legend('bottomleft',legend = unique(means.lulc$Site),pch=site.symbols,pt.bg = "black",bty='n',cex=0.9)
+gradient.rect(-1.5,-0.7,-1,-0.6,col=colors)
+
+text(-1.5,-0.57,"2000",adj=c(0,0),cex=0.7)
+text(-1,-0.57,"2018",adj=c(1,0),cex=0.7)
 
 
 dev.off()
+
+
 
 
 
