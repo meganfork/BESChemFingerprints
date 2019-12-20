@@ -61,7 +61,7 @@ for(i in 1:length(data$water.year)){
   }
 }
 
-###Make a color pallette for 20 classes (20 years of data)
+###Make a color pallette for 19 classes (19 years of data)
 colors<-viridis(19)
 #colors<-c("gray20","gray40", "gray60", "gray80", rgb(19,149,186,maxColorValue=255),rgb(17,120,153,maxColorValue=255),rgb(17,120,153,maxColorValue=255),
          # rgb(15,91,120,maxColorValue=255),rgb(192,46,29,maxColorValue=255), rgb(217,78,31,maxColorValue=255), rgb(241,108,32,maxColorValue=255), 
@@ -78,7 +78,7 @@ summary.data<-data %>%
                     mean.TN=mean(TN, na.rm=T), max.TN=max(TN, na.rm=T), min.TN=min(TN, na.rm=T),
                     mean.TP=mean(TP, na.rm=T), max.TP=max(TP, na.rm=T), min.TP=min(TP, na.rm=T))
 
-#Remove 1999 and 2019 from the records as we don't have a full record of those years
+#Remove 2019 from the records as we don't have TN and TP from 1999 nor a full record from 2019
 summary.data<-summary.data[summary.data$water.year!=1999 & summary.data$water.year!=2019,]
 
 range.data<-data %>% 
@@ -90,7 +90,7 @@ range.data<-data %>%
                     TN.range<-max(TN, na.rm=T)-min(TN, na.rm=T),
                     TP.range<-max(TP, na.rm=T)-min(TP, na.rm=T))
  
-range.data<-range.data[range.data$water.year!=1999&range.data$water.year!=2019,]
+range.data<-range.data[range.data$water.year!=1999 & range.data$water.year!=2019,]
 
 colnames(range.data)<-c("water.year", "Site", "Cl", "NO3", "PO4", "SO4", "TN", "TP")
 
@@ -157,16 +157,24 @@ BESflow<-readNWISdv(siteNumbers = USGS.site.nos$siteNumber,parameterCd = '00060'
 
 
 
+# Multisolute Analysis Plan:
+# Run PCAs for the following annual summaries of BES stream chem: annual mean, annual range, annual min, annual max, annual C-Q slope, annual CV of chem:annual CV of flow
+# plot each of these using viridis color ramp to differentiate among years (show progression through time, maybe add arrows between successive years?)
+# Perhaps also run PCAs for all the points within each site, and compare hull areas or centroids for each year to get a sense of how sampling "snapshots" of water chem are changing
+# think about how to compare reactive and conservative solutes (CV ratio?)
+# think about some way to summarize multi-solute exceeedence probabilities? 
+# Changing flow thresholds for N going from reactive to conservative behavior
+# Adding pharma data when we get the data back from Jerker?
 
 ####################################################
 ###              Annual Ordinations              ###
 ####################################################
 
-# Plan:
-# Run PCAs for the following annual summaries of BES stream chem: annual mean, annual range, annual min, annual max, annual C-Q slope, annual CV of chem:annual CV of flow
-# plot each of these using viridis color ramp to differentiate among years (show progression through time, maybe add arrows between successive years?)
-# Perhaps also run PCAs for all the points within each site, and compare hull areas or centroids for each year to get a sense of how sampling "snapshots" of water chem are changing
-# think about how to compare reactive and conservative solutes (CV ratio?)
+### 1. Annual means 
+
+
+
+
 
 
 
