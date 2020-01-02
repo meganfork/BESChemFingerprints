@@ -243,6 +243,126 @@ dev.off()
 
 
 
+#### 2. Annual range 
+range.pca<-rda(range.data[,3:8], scale=T)
+# PC1 explains 35.31% of the variation, PC2 explains 25.85% of the variation
+
+scores.range<-scores(range.pca)
+row.names(scores.range$species)<-c("Cl","NO3","PO4","SO4","TN","TP")
+
+
+## Biplot A: site by color with loadings
+
+png("FIGURES/PCAonAnnualRanges_A.png",height=5,width=5,units='in',res=300)
+par(mar=c(3,3,0.2,0.2))
+par(mgp=c(1.5,0.4,0))
+plot(range.pca,xlab="PC 1 (35.3%)",ylab="PC 2 (25.9%)",type="n",axes=F,xlim=c(-1,2),ylim=c(-2.2,1.5))
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+
+arrows(0,0,scores.range$species[,1],scores.range$species[,2],length=0.1,angle=30)
+Nudge<-1.05
+text(scores.range$species[,1]*Nudge,scores.range$species[,2]*Nudge,rownames(scores.range$species),cex=0.8,font=2)
+
+# add sites as colors
+
+for (i in 1:length(unique(range.data$Site))){
+  points(as.vector(scores.range$sites[which(range.data$Site==unique(range.data$Site)[i]),1]),as.vector(scores.range$sites[which(range.data$Site==unique(range.data$Site)[i]),2]),col=site.colors[i])
+}
+legend('bottomleft',legend = unique(range.data$Site),col=site.colors,pch=1,pt.lwd=2)
+
+dev.off()
+
+
+## Biplot B: zoomed in with site by symbol and year by color
+
+png("FIGURES/PCAonAnnualRanges_B.png",height=5,width=5,units='in',res=300)
+par(mar=c(3,3,0.2,0.2))
+par(mgp=c(1.5,0.4,0))
+plot(range.pca,xlab="PC 1 (35.3%)",ylab="PC 2 (25.9%)",type="n",axes=F,xlim=c(-0.5,2),ylim=c(-2,1.5))
+axis(1,tck=0.015)
+axis(2,tck=0.015)
+box()
+
+# add points with site indicated by symbol and year by color (viridis color palette for years is names "colors")
+
+for (i in 1:length(unique(range.data$Site))){
+  for (j in 1:length(unique(range.data$water.year))){
+    points(as.vector(scores.range$sites[which(range.data$Site==unique(range.data$Site)[i]&range.data$water.year==unique(range.data$water.year)[j]),1]),as.vector(scores.range$sites[which(range.data$Site==unique(range.data$Site)[i]&range.data$water.year==unique(range.data$water.year)[j]),2]),pch=site.symbols[i],col=colors[j],bg=colors[j])
+  }
+}
+
+legend('bottomright',legend = unique(range.data$Site),pch=site.symbols,pt.bg = "black",bty='n',cex=0.9)
+gradient.rect(2,-0.7,2.6,-0.6,col=colors)
+
+text(2,-0.57,"2000",adj=c(0,0),cex=0.7)
+text(2.6,-0.57,"2018",adj=c(1,0),cex=0.7)
+
+
+dev.off()
+
+
+
+
+#### 3. Annual maxima 
+max.pca<-rda(summary.data[,seq(from=4,by=3,length.out = 6)], scale=T)
+# PC1 explains 35.14% of the variation, PC2 explains 26.88% of the variation
+
+scores.max<-scores(max.pca)
+row.names(scores.max$species)<-c("Cl","NO3","PO4","SO4","TN","TP")
+
+
+## Biplot A: site by color with loadings
+
+png("FIGURES/PCAonAnnualMaxima_A.png",height=5,width=5,units='in',res=300)
+par(mar=c(3,3,0.2,0.2))
+par(mgp=c(1.5,0.4,0))
+plot(max.pca,xlab="PC 1 (35.1%)",ylab="PC 2 (26.9%)",type="n",axes=F,xlim=c(-1,2.2),ylim=c(-1,2.2))
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+
+arrows(0,0,scores.max$species[,1],scores.max$species[,2],length=0.1,angle=30)
+Nudge<-1.05
+text(scores.max$species[,1]*Nudge,scores.max$species[,2]*Nudge,rownames(scores.max$species),cex=0.8,font=2)
+
+# add sites as colors
+
+for (i in 1:length(unique(summary.data$Site))){
+  points(as.vector(scores.max$sites[which(summary.data$Site==unique(summary.data$Site)[i]),1]),as.vector(scores.max$sites[which(summary.data$Site==unique(summary.data$Site)[i]),2]),col=site.colors[i])
+}
+legend('topright',legend = unique(summary.data$Site),col=site.colors,pch=1,pt.lwd=2)
+
+dev.off()
+
+
+## Biplot B: zoomed in with site by symbol and year by color
+
+png("FIGURES/PCAonAnnualMaxima_B.png",height=5,width=5,units='in',res=300)
+par(mar=c(3,3,0.2,0.2))
+par(mgp=c(1.5,0.4,0))
+plot(max.pca,xlab="PC 1 (35.1%)",ylab="PC 2 (26.9%)",type="n",axes=F,xlim=c(-1,2.2),ylim=c(-1,2.2))
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+
+# add points with site indicated by symbol and year by color (viridis color palette for years is names "colors")
+
+for (i in 1:length(unique(summary.data$Site))){
+  for (j in 1:length(unique(summary.data$water.year))){
+    points(as.vector(scores.max$sites[which(summary.data$Site==unique(summary.data$Site)[i]&summary.data$water.year==unique(summary.data$water.year)[j]),1]),as.vector(scores.max$sites[which(summary.data$Site==unique(summary.data$Site)[i]&summary.data$water.year==unique(summary.data$water.year)[j]),2]),pch=site.symbols[i],col=colors[j],bg=colors[j])
+  }
+}
+
+legend('topright',legend = unique(summary.data$Site),pch=site.symbols,pt.bg = "black",bty='n',cex=0.9)
+gradient.rect(1.75,1.05,2.3,0.95,col=colors)
+
+text(1.75,0.85,"2000",adj=c(0,0),cex=0.7)
+text(2.3,0.85,"2018",adj=c(1,0),cex=0.7)
+
+
+dev.off()
 
 
 
