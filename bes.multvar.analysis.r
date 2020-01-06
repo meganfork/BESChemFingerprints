@@ -235,7 +235,7 @@ for (i in 1:length(CandQ.bysite)){
     #For each solute, an if statement returns NA if the number of annual observations for either flow or conc is less than 40; otherwise C-Q is calculated
     #Cl
     if(length(which(is.na(wateryear.sub$Cl)==F))>40 & length(which(is.na(wateryear.sub$meanDailyQ_Ls)==F))>40){
-      Cl.lm<-lm(log10(wateryear.sub$Cl)~log10(wateryear.sub$meanDailyQ_Ls),na.action = na.omit)
+      Cl.lm<-lm(log10(wateryear.sub$Cl)~log10(wateryear.sub$meanDailyQ_Ls+0.00001),na.action = na.omit)
       annualCQ.bysite[[i]]$Cl.slope[j]<-summary(Cl.lm)$coefficients[2]
       annualCQ.bysite[[i]]$Cl.p.val[j]<-lmp(Cl.lm)
       annualCQ.bysite[[i]]$Cl.r2[j]<-summary(Cl.lm)$adj.r.squared
@@ -246,10 +246,11 @@ for (i in 1:length(CandQ.bysite)){
       annualCQ.bysite[[i]]$Cl.r2[j]<-NA
       annualCQ.bysite[[i]]$Cl.n.obs[j]<-NA
     }
+        
     
     #SO4
     if(length(which(is.na(wateryear.sub$SO4)==F))>40 & length(which(is.na(wateryear.sub$meanDailyQ_Ls)==F))>40){
-      SO4.lm<-lm(log10(wateryear.sub$SO4)~log10(wateryear.sub$meanDailyQ_Ls),na.action = na.omit)
+      SO4.lm<-lm(log10(wateryear.sub$SO4)~log10(wateryear.sub$meanDailyQ_Ls+0.00001),na.action = na.omit)
       annualCQ.bysite[[i]]$SO4.slope[j]<-summary(SO4.lm)$coefficients[2]
       annualCQ.bysite[[i]]$SO4.p.val[j]<-lmp(SO4.lm)
       annualCQ.bysite[[i]]$SO4.r2[j]<-summary(SO4.lm)$adj.r.squared
@@ -263,7 +264,7 @@ for (i in 1:length(CandQ.bysite)){
     
     #NO3
     if(length(which(is.na(wateryear.sub$NO3)==F))>40 & length(which(is.na(wateryear.sub$meanDailyQ_Ls)==F))>40){
-      NO3.lm<-lm(log10(wateryear.sub$NO3+0.005)~log10(wateryear.sub$meanDailyQ_Ls),na.action = na.omit)
+      NO3.lm<-lm(log10(wateryear.sub$NO3+0.005)~log10(wateryear.sub$meanDailyQ_Ls+0.00001),na.action = na.omit)
       annualCQ.bysite[[i]]$NO3.slope[j]<-summary(NO3.lm)$coefficients[2]
       annualCQ.bysite[[i]]$NO3.p.val[j]<-lmp(NO3.lm)
       annualCQ.bysite[[i]]$NO3.r2[j]<-summary(NO3.lm)$adj.r.squared
@@ -277,7 +278,7 @@ for (i in 1:length(CandQ.bysite)){
     
     #PO4
     if(length(which(is.na(wateryear.sub$PO4)==F))>40 & length(which(is.na(wateryear.sub$meanDailyQ_Ls)==F))>40){
-      PO4.lm<-lm(log10(wateryear.sub$PO4)~log10(wateryear.sub$meanDailyQ_Ls),na.action = na.omit)
+      PO4.lm<-lm(log10(wateryear.sub$PO4)~log10(wateryear.sub$meanDailyQ_Ls+0.00001),na.action = na.omit)
       annualCQ.bysite[[i]]$PO4.slope[j]<-summary(PO4.lm)$coefficients[2]
       annualCQ.bysite[[i]]$PO4.p.val[j]<-lmp(PO4.lm)
       annualCQ.bysite[[i]]$PO4.r2[j]<-summary(PO4.lm)$adj.r.squared
@@ -291,7 +292,7 @@ for (i in 1:length(CandQ.bysite)){
     
    #TN
     if(length(which(is.na(wateryear.sub$TN)==F))>40 & length(which(is.na(wateryear.sub$meanDailyQ_Ls)==F))>40){
-    TN.lm<-lm(log10(wateryear.sub$TN)~log10(wateryear.sub$meanDailyQ_Ls),na.action = na.omit)
+    TN.lm<-lm(log10(wateryear.sub$TN)~log10(wateryear.sub$meanDailyQ_Ls+0.00001),na.action = na.omit)
     annualCQ.bysite[[i]]$TN.slope[j]<-summary(TN.lm)$coefficients[2]
     annualCQ.bysite[[i]]$TN.p.val[j]<-lmp(TN.lm)
     annualCQ.bysite[[i]]$TN.r2[j]<-summary(TN.lm)$adj.r.squared
@@ -305,17 +306,17 @@ for (i in 1:length(CandQ.bysite)){
     
     #TP
     if(length(which(is.na(wateryear.sub$TP)==F))>40 & length(which(is.na(wateryear.sub$meanDailyQ_Ls)==F))>40){
-      TP.lm<-lm(log10(wateryear.sub$TP)~log10(wateryear.sub$meanDailyQ_Ls),na.action = na.omit)
+      TP.lm<-lm(log10(wateryear.sub$TP)~log10(wateryear.sub$meanDailyQ_Ls+0.00001),na.action = na.omit)
       annualCQ.bysite[[i]]$TP.slope[j]<-summary(TP.lm)$coefficients[2]
       annualCQ.bysite[[i]]$TP.p.val[j]<-lmp(TP.lm)
       annualCQ.bysite[[i]]$TP.r2[j]<-summary(TP.lm)$adj.r.squared
       annualCQ.bysite[[i]]$TP.n.obs[j]<-length(which(is.na(wateryear.sub$TP)==F))
-    } else {
+      } else {
       annualCQ.bysite[[i]]$TP.slope[j]<-NA
       annualCQ.bysite[[i]]$TP.p.val[j]<-NA
       annualCQ.bysite[[i]]$TP.r2[j]<-NA
       annualCQ.bysite[[i]]$TP.n.obs[j]<-NA
-    }
+      }
   }
 }
 names(annualCQ.bysite)<-USGS.site.nos$siteName
