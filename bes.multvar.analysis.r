@@ -76,7 +76,7 @@ for(i in 1:length(data$water.year)){
   }
 }
 
-###Make a color pallette for 19 classes (19 years of data)
+###Make a color pallette for 19 classes (19 years of data from water year 2000-2018)
 colors<-viridis(19)
 #colors<-c("gray20","gray40", "gray60", "gray80", rgb(19,149,186,maxColorValue=255),rgb(17,120,153,maxColorValue=255),rgb(17,120,153,maxColorValue=255),
          # rgb(15,91,120,maxColorValue=255),rgb(192,46,29,maxColorValue=255), rgb(217,78,31,maxColorValue=255), rgb(241,108,32,maxColorValue=255), 
@@ -193,32 +193,38 @@ names(CandQ.bysite)<-USGS.site.nos$siteName
 
 ## calculate the C-Q relationship for each by looping over year within site
 
-BES.water.years<-seq(from=1999,to=2018,by=1)
+BES.water.years<-seq(from=2000,to=2018,by=1)
 annualCQ.bysite<-list()
 #initialize the list with blank dataframes
 for (i in 1:length(CandQ.bysite)){
   annualCQ.bysite[[i]]<-data.frame(water.year=BES.water.years,
                                    Cl.slope=rep(NA,times=length(BES.water.years)),
+                                   Cl.int=rep(NA,times=length(BES.water.years)),
                                    Cl.p.val=rep(NA,times=length(BES.water.years)),
                                    Cl.r2=rep(NA,times=length(BES.water.years)),
                                    Cl.n.obs=rep(NA,times=length(BES.water.years)),
                                    SO4.slope=rep(NA,times=length(BES.water.years)),
+                                   SO4.int=rep(NA,times=length(BES.water.years)),
                                    SO4.p.val=rep(NA,times=length(BES.water.years)),
                                    SO4.r2=rep(NA,times=length(BES.water.years)),
                                    SO4.n.obs=rep(NA,times=length(BES.water.years)),
                                    NO3.slope=rep(NA,times=length(BES.water.years)),
+                                   NO3.int=rep(NA,times=length(BES.water.years)),
                                    NO3.p.val=rep(NA,times=length(BES.water.years)),
                                    NO3.r2=rep(NA,times=length(BES.water.years)),
                                    NO3.n.obs=rep(NA,times=length(BES.water.years)),
                                    PO4.slope=rep(NA,times=length(BES.water.years)),
+                                   PO4.int=rep(NA,times=length(BES.water.years)),
                                    PO4.p.val=rep(NA,times=length(BES.water.years)),
                                    PO4.r2=rep(NA,times=length(BES.water.years)),
                                    PO4.n.obs=rep(NA,times=length(BES.water.years)),
                                    TN.slope=rep(NA,times=length(BES.water.years)),
+                                   TN.int=rep(NA,times=length(BES.water.years)),
                                    TN.p.val=rep(NA,times=length(BES.water.years)),
                                    TN.r2=rep(NA,times=length(BES.water.years)),
                                    TN.n.obs=rep(NA,times=length(BES.water.years)),
                                    TP.slope=rep(NA,times=length(BES.water.years)),
+                                   TP.int=rep(NA,times=length(BES.water.years)),
                                    TP.p.val=rep(NA,times=length(BES.water.years)),
                                    TP.r2=rep(NA,times=length(BES.water.years)),
                                    TP.n.obs=rep(NA,times=length(BES.water.years)))
@@ -237,11 +243,13 @@ for (i in 1:length(CandQ.bysite)){
     if(length(which(is.na(wateryear.sub$Cl)==F))>40 & length(which(is.na(wateryear.sub$meanDailyQ_Ls)==F))>40){
       Cl.lm<-lm(log10(wateryear.sub$Cl)~log10(wateryear.sub$meanDailyQ_Ls+0.00001),na.action = na.omit)
       annualCQ.bysite[[i]]$Cl.slope[j]<-summary(Cl.lm)$coefficients[2]
+      annualCQ.bysite[[i]]$Cl.int[j]<-summary(Cl.lm)$coefficients[1]
       annualCQ.bysite[[i]]$Cl.p.val[j]<-lmp(Cl.lm)
       annualCQ.bysite[[i]]$Cl.r2[j]<-summary(Cl.lm)$adj.r.squared
       annualCQ.bysite[[i]]$Cl.n.obs[j]<-length(which(is.na(wateryear.sub$Cl)==F))
     } else {
       annualCQ.bysite[[i]]$Cl.slope[j]<-NA
+      annualCQ.bysite[[i]]$Cl.int[j]<-NA
       annualCQ.bysite[[i]]$Cl.p.val[j]<-NA
       annualCQ.bysite[[i]]$Cl.r2[j]<-NA
       annualCQ.bysite[[i]]$Cl.n.obs[j]<-NA
@@ -252,11 +260,13 @@ for (i in 1:length(CandQ.bysite)){
     if(length(which(is.na(wateryear.sub$SO4)==F))>40 & length(which(is.na(wateryear.sub$meanDailyQ_Ls)==F))>40){
       SO4.lm<-lm(log10(wateryear.sub$SO4)~log10(wateryear.sub$meanDailyQ_Ls+0.00001),na.action = na.omit)
       annualCQ.bysite[[i]]$SO4.slope[j]<-summary(SO4.lm)$coefficients[2]
+      annualCQ.bysite[[i]]$SO4.int[j]<-summary(SO4.lm)$coefficients[1]
       annualCQ.bysite[[i]]$SO4.p.val[j]<-lmp(SO4.lm)
       annualCQ.bysite[[i]]$SO4.r2[j]<-summary(SO4.lm)$adj.r.squared
       annualCQ.bysite[[i]]$SO4.n.obs[j]<-length(which(is.na(wateryear.sub$SO4)==F))
     } else {
       annualCQ.bysite[[i]]$SO4.slope[j]<-NA
+      annualCQ.bysite[[i]]$SO4.int[j]<-NA
       annualCQ.bysite[[i]]$SO4.p.val[j]<-NA
       annualCQ.bysite[[i]]$SO4.r2[j]<-NA
       annualCQ.bysite[[i]]$SO4.n.obs[j]<-NA
@@ -266,11 +276,13 @@ for (i in 1:length(CandQ.bysite)){
     if(length(which(is.na(wateryear.sub$NO3)==F))>40 & length(which(is.na(wateryear.sub$meanDailyQ_Ls)==F))>40){
       NO3.lm<-lm(log10(wateryear.sub$NO3+0.005)~log10(wateryear.sub$meanDailyQ_Ls+0.00001),na.action = na.omit)
       annualCQ.bysite[[i]]$NO3.slope[j]<-summary(NO3.lm)$coefficients[2]
+      annualCQ.bysite[[i]]$NO3.int[j]<-summary(NO3.lm)$coefficients[1]
       annualCQ.bysite[[i]]$NO3.p.val[j]<-lmp(NO3.lm)
       annualCQ.bysite[[i]]$NO3.r2[j]<-summary(NO3.lm)$adj.r.squared
       annualCQ.bysite[[i]]$NO3.n.obs[j]<-length(which(is.na(wateryear.sub$NO3)==F))
     } else {
       annualCQ.bysite[[i]]$NO3.slope[j]<-NA
+      annualCQ.bysite[[i]]$NO3.int[j]<-NA
       annualCQ.bysite[[i]]$NO3.p.val[j]<-NA
       annualCQ.bysite[[i]]$NO3.r2[j]<-NA
       annualCQ.bysite[[i]]$NO3.n.obs[j]<-NA
@@ -280,11 +292,13 @@ for (i in 1:length(CandQ.bysite)){
     if(length(which(is.na(wateryear.sub$PO4)==F))>40 & length(which(is.na(wateryear.sub$meanDailyQ_Ls)==F))>40){
       PO4.lm<-lm(log10(wateryear.sub$PO4)~log10(wateryear.sub$meanDailyQ_Ls+0.00001),na.action = na.omit)
       annualCQ.bysite[[i]]$PO4.slope[j]<-summary(PO4.lm)$coefficients[2]
+      annualCQ.bysite[[i]]$PO4.int[j]<-summary(PO4.lm)$coefficients[1]
       annualCQ.bysite[[i]]$PO4.p.val[j]<-lmp(PO4.lm)
       annualCQ.bysite[[i]]$PO4.r2[j]<-summary(PO4.lm)$adj.r.squared
       annualCQ.bysite[[i]]$PO4.n.obs[j]<-length(which(is.na(wateryear.sub$PO4)==F))
     } else {
       annualCQ.bysite[[i]]$PO4.slope[j]<-NA
+      annualCQ.bysite[[i]]$PO4.int[j]<-NA
       annualCQ.bysite[[i]]$PO4.p.val[j]<-NA
       annualCQ.bysite[[i]]$PO4.r2[j]<-NA
       annualCQ.bysite[[i]]$PO4.n.obs[j]<-NA
@@ -294,11 +308,13 @@ for (i in 1:length(CandQ.bysite)){
     if(length(which(is.na(wateryear.sub$TN)==F))>40 & length(which(is.na(wateryear.sub$meanDailyQ_Ls)==F))>40){
     TN.lm<-lm(log10(wateryear.sub$TN)~log10(wateryear.sub$meanDailyQ_Ls+0.00001),na.action = na.omit)
     annualCQ.bysite[[i]]$TN.slope[j]<-summary(TN.lm)$coefficients[2]
+    annualCQ.bysite[[i]]$TN.int[j]<-summary(TN.lm)$coefficients[1]
     annualCQ.bysite[[i]]$TN.p.val[j]<-lmp(TN.lm)
     annualCQ.bysite[[i]]$TN.r2[j]<-summary(TN.lm)$adj.r.squared
     annualCQ.bysite[[i]]$TN.n.obs[j]<-length(which(is.na(wateryear.sub$TN)==F))
     } else {
       annualCQ.bysite[[i]]$TN.slope[j]<-NA
+      annualCQ.bysite[[i]]$TN.int[j]<-NA
       annualCQ.bysite[[i]]$TN.p.val[j]<-NA
       annualCQ.bysite[[i]]$TN.r2[j]<-NA
       annualCQ.bysite[[i]]$TN.n.obs[j]<-NA
@@ -308,11 +324,13 @@ for (i in 1:length(CandQ.bysite)){
     if(length(which(is.na(wateryear.sub$TP)==F))>40 & length(which(is.na(wateryear.sub$meanDailyQ_Ls)==F))>40){
       TP.lm<-lm(log10(wateryear.sub$TP)~log10(wateryear.sub$meanDailyQ_Ls+0.00001),na.action = na.omit)
       annualCQ.bysite[[i]]$TP.slope[j]<-summary(TP.lm)$coefficients[2]
+      annualCQ.bysite[[i]]$TP.int[j]<-summary(TP.lm)$coefficients[1]
       annualCQ.bysite[[i]]$TP.p.val[j]<-lmp(TP.lm)
       annualCQ.bysite[[i]]$TP.r2[j]<-summary(TP.lm)$adj.r.squared
       annualCQ.bysite[[i]]$TP.n.obs[j]<-length(which(is.na(wateryear.sub$TP)==F))
       } else {
       annualCQ.bysite[[i]]$TP.slope[j]<-NA
+      annualCQ.bysite[[i]]$TP.int[j]<-NA
       annualCQ.bysite[[i]]$TP.p.val[j]<-NA
       annualCQ.bysite[[i]]$TP.r2[j]<-NA
       annualCQ.bysite[[i]]$TP.n.obs[j]<-NA
@@ -320,6 +338,56 @@ for (i in 1:length(CandQ.bysite)){
   }
 }
 names(annualCQ.bysite)<-USGS.site.nos$siteName
+
+for (i in 1:length(annualCQ.bysite)){
+  annualCQ.bysite[[i]]$Site<-names(annualCQ.bysite)[i]
+}
+
+annualCQ<-do.call("rbind",annualCQ.bysite) #make "by-site" list into one dataframe
+
+
+### make figures for each site+solute combination showing all years in viridris
+solutes<-c("Cl","NO3","PO4","SO4","TN","TP")
+
+for (i in 1:length(CandQ.bysite)){
+  for (j in 1:length(solutes)){
+    
+    png(paste0("Figures/C-Q visualizations/",names(CandQ.bysite)[i],"_",solutes[j],"annualCQ_00to18.png"),height=15,width=15,units='cm',res=300)
+    par(mar = c(2.5,3,0.5,0.5),
+        mgp=c(1.3,0.2,0))
+    
+    plot(log10(CandQ.bysite[[i]][,which(colnames(CandQ.bysite[[i]])==solutes[j])]+0.005)~log10(CandQ.bysite[[i]][,"meanDailyQ_Ls"]+0.00001),xlab=expression(paste("log(Q) (L s"^-1,")")),ylab=substitute(expression("log("*nn*") (mg L"^-1*")"),list(nn=solutes[j])),axes=F,type="n")
+    axis(1,tck=0.02,cex.axis=0.85)
+    axis(2,tck=0.02,cex.axis=0.85)
+    box()
+    
+    for (k in 1:length(BES.water.years)){
+    wateryear.sub<-filter(CandQ.bysite[[i]],water.year==BES.water.years[k])
+    
+    points(log10(wateryear.sub[,which(colnames(CandQ.bysite[[i]])==solutes[j])]+0.005)~log10(wateryear.sub[,"meanDailyQ_Ls"]+0.00001),pch=1,col=colors[k])
+    
+    
+    #if statement based on presence and significance of C-Q relationship for plotting annual ablines
+    
+    if(is.na(annualCQ.bysite[[i]][k,which(colnames(annualCQ.bysite[[i]])==paste0(solutes[j],".p.val"))])==F & 
+       annualCQ.bysite[[i]][k,which(colnames(annualCQ.bysite[[i]])==paste0(solutes[j],".p.val"))]<0.05){
+      
+          abline(annualCQ.bysite[[i]][k,which(colnames(annualCQ.bysite[[i]])==paste0(solutes[j],".int"))],
+                 annualCQ.bysite[[i]][k,which(colnames(annualCQ.bysite[[i]])==paste0(solutes[j],".slope"))],
+                 col=colors[k],lwd=2)  
+      } else if (is.na(annualCQ.bysite[[i]][k,which(colnames(annualCQ.bysite[[i]])==paste0(solutes[j],".p.val"))])==F & 
+               annualCQ.bysite[[i]][k,which(colnames(annualCQ.bysite[[i]])==paste0(solutes[j],".p.val"))]>0.05){
+          
+          abline(annualCQ.bysite[[i]][k,which(colnames(annualCQ.bysite[[i]])==paste0(solutes[j],".int"))],
+                 annualCQ.bysite[[i]][k,which(colnames(annualCQ.bysite[[i]])==paste0(solutes[j],".slope"))],
+                 col=colors[k],lty=2)  
+      }
+    
+    }
+    dev.off()
+  }
+}
+
 
 
 
@@ -336,35 +404,36 @@ names(annualCQ.bysite)<-USGS.site.nos$siteName
 # Changing flow thresholds for N going from reactive to conservative behavior
 # Adding pharma data when we get the data back from Jerker?
 
-####################################################
-###              Annual Ordinations              ###
-####################################################
+################################################################
+###              Annual Ordinations (minus MCDN)             ###
+################################################################
 site.colors<-c('#1b9e77',
                '#d95f02',
                '#7570b3',
                '#e7298a',
                '#66a61e',
                '#e6ab02',
-               '#a6761d',
                '#666666')
 site.symbols<-c(3,16,25,15,24,18,1,4)
 
 
 
 #### 1. Annual means 
-mean.pca<-rda(means.lulc[,3:8], scale=T)
-# PC1 explains 56.45% of the variation, PC2 explains 31.06% of the variation
+means.minusMCDN<-filter(means.lulc,Site!="MCDN") #remove the ag site from analysis
+
+mean.pca<-rda(means.minusMCDN[,3:8], scale=T)
+# PC1 explains 49.42% of the variation, PC2 explains 29.46% of the variation
 
 scores.mean<-scores(mean.pca)
-row.names(scores.mean$species)<-c("Cl","NO3","PO4","TP","TN","TP")
+row.names(scores.mean$species)<-c("Cl","NO3","PO4","SO4","TN","TP")
 
 
 ## Biplot A: site by color with loadings
 
-png("FIGURES/PCAonAnnualMeans_A.png",height=5,width=5,units='in',res=300)
+png("FIGURES/PCAonAnnualMeans(noMCDN)_A.png",height=5,width=5,units='in',res=300)
 par(mar=c(3,3,0.2,0.2))
 par(mgp=c(1.5,0.4,0))
-plot(mean.pca,xlab="PC 1 (56.5%)",ylab="PC 2 (31.1%)",type="n",axes=F,xlim=c(-2.2,0.9),ylim=c(-2.2,0.9))
+plot(mean.pca,xlab="PC 1 (49.4%)",ylab="PC 2 (29.5%)",type="n",axes=F,xlim=c(-1,2.2),ylim=c(-2.2,1))
 axis(1,tck=0.02)
 axis(2,tck=0.02)
 box()
@@ -375,37 +444,37 @@ text(scores.mean$species[,1]*Nudge,scores.mean$species[,2]*Nudge,rownames(scores
   
 # add sites as colors
 
-for (i in 1:length(unique(means.lulc$Site))){
-points(as.vector(scores.mean$sites[which(means.lulc$Site==unique(means.lulc$Site)[i]),1]),as.vector(scores.mean$sites[which(means.lulc$Site==unique(means.lulc$Site)[i]),2]),col=site.colors[i])
+for (i in 1:length(unique(means.minusMCDN$Site))){
+points(as.vector(scores.mean$sites[which(means.minusMCDN$Site==unique(means.minusMCDN$Site)[i]),1]),as.vector(scores.mean$sites[which(means.minusMCDN$Site==unique(means.minusMCDN$Site)[i]),2]),col=site.colors[i])
 }
-legend('bottomleft',legend = unique(means.lulc$Site),col=site.colors,pch=1,pt.lwd=2)
+legend('bottomleft',legend = unique(means.minusMCDN$Site),col=site.colors,pch=1,pt.lwd=2)
 
 dev.off()
 
 
 ## Biplot B: zoomed in with site by symbol and year by color
 
-png("FIGURES/PCAonAnnualMeans_B.png",height=5,width=5,units='in',res=300)
+png("FIGURES/PCAonAnnualMeans(noMCDN)_B.png",height=5,width=5,units='in',res=300)
 par(mar=c(3,3,0.2,0.2))
 par(mgp=c(1.5,0.4,0))
-plot(mean.pca,xlab="PC 1 (56.5%)",ylab="PC 2 (31.1%)",type="n",axes=F,xlim=c(-1.5,0.6),ylim=c(-1.5,0.6))
+plot(mean.pca,xlab="PC 1 (49.4%)",ylab="PC 2 (29.5%)",type="n",axes=F,xlim=c(-1,1),ylim=c(-1.5,1))
 axis(1,tck=0.015)
 axis(2,tck=0.015)
 box()
 
 # add points with site indicated by symbol and year by color (viridis color palette for years is names "colors")
 
-for (i in 1:length(unique(means.lulc$Site))){
-  for (j in 1:length(unique(means.lulc$water.year))){
-    points(as.vector(scores.mean$sites[which(means.lulc$Site==unique(means.lulc$Site)[i]&means.lulc$water.year==unique(means.lulc$water.year)[j]),1]),as.vector(scores.mean$sites[which(means.lulc$Site==unique(means.lulc$Site)[i]&means.lulc$water.year==unique(means.lulc$water.year)[j]),2]),pch=site.symbols[i],col=colors[j],bg=colors[j])
+for (i in 1:length(unique(means.minusMCDN$Site))){
+  for (j in 1:length(unique(means.minusMCDN$water.year))){
+    points(as.vector(scores.mean$sites[which(means.minusMCDN$Site==unique(means.minusMCDN$Site)[i]&means.minusMCDN$water.year==unique(means.minusMCDN$water.year)[j]),1]),as.vector(scores.mean$sites[which(means.minusMCDN$Site==unique(means.minusMCDN$Site)[i]&means.minusMCDN$water.year==unique(means.minusMCDN$water.year)[j]),2]),pch=site.symbols[i],col=colors[j],bg=colors[j])
   }
 }
 
-legend('bottomleft',legend = unique(means.lulc$Site),pch=site.symbols,pt.bg = "black",bty='n',cex=0.9)
-gradient.rect(-1.5,-0.7,-1,-0.6,col=colors)
+legend('bottomleft',legend = unique(means.minusMCDN$Site),pch=site.symbols,pt.bg = "black",bty='n',cex=0.9)
+gradient.rect(-1.3,-0.7,-0.85,-0.6,col=colors)
 
-text(-1.5,-0.57,"2000",adj=c(0,0),cex=0.7)
-text(-1,-0.57,"2018",adj=c(1,0),cex=0.7)
+text(-1.3,-0.57,"2000",adj=c(0,0),cex=0.7)
+text(-0.85,-0.57,"2018",adj=c(1,0),cex=0.7)
 
 
 dev.off()
@@ -413,19 +482,21 @@ dev.off()
 
 
 #### 2. Annual range 
-range.pca<-rda(range.data[,3:8], scale=T)
-# PC1 explains 35.31% of the variation, PC2 explains 25.85% of the variation
+range.minusMCDN<-filter(range.data,Site!="MCDN") #remove the ag site from analysis
+
+range.pca<-rda(range.minusMCDN[,3:8], scale=T)
+# PC1 explains 37.2% of the variation, PC2 explains 20.11% of the variation
 
 scores.range<-scores(range.pca)
-row.names(scores.range$species)<-c("Cl","NO3","PO4","TP","TN","TP")
+row.names(scores.range$species)<-c("Cl","NO3","PO4","SO4","TN","TP")
 
 
 ## Biplot A: site by color with loadings
 
-png("FIGURES/PCAonAnnualRanges_A.png",height=5,width=5,units='in',res=300)
+png("FIGURES/PCAonAnnualRanges(noMCDN)_A.png",height=5,width=5,units='in',res=300)
 par(mar=c(3,3,0.2,0.2))
 par(mgp=c(1.5,0.4,0))
-plot(range.pca,xlab="PC 1 (35.3%)",ylab="PC 2 (25.9%)",type="n",axes=F,xlim=c(-1,2),ylim=c(-2.2,1.5))
+plot(range.pca,xlab="PC 1 (37.2%)",ylab="PC 2 (20.1%)",type="n",axes=F,xlim=c(-1,2),ylim=c(-2,1.5))
 axis(1,tck=0.02)
 axis(2,tck=0.02)
 box()
@@ -436,37 +507,37 @@ text(scores.range$species[,1]*Nudge,scores.range$species[,2]*Nudge,rownames(scor
 
 # add sites as colors
 
-for (i in 1:length(unique(range.data$Site))){
-  points(as.vector(scores.range$sites[which(range.data$Site==unique(range.data$Site)[i]),1]),as.vector(scores.range$sites[which(range.data$Site==unique(range.data$Site)[i]),2]),col=site.colors[i])
+for (i in 1:length(unique(range.minusMCDN$Site))){
+  points(as.vector(scores.range$sites[which(range.minusMCDN$Site==unique(range.minusMCDN$Site)[i]),1]),as.vector(scores.range$sites[which(range.minusMCDN$Site==unique(range.minusMCDN$Site)[i]),2]),col=site.colors[i])
 }
-legend('bottomleft',legend = unique(range.data$Site),col=site.colors,pch=1,pt.lwd=2)
+legend('bottomleft',legend = unique(range.minusMCDN$Site),col=site.colors,pch=1,pt.lwd=2)
 
 dev.off()
 
 
 ## Biplot B: zoomed in with site by symbol and year by color
 
-png("FIGURES/PCAonAnnualRanges_B.png",height=5,width=5,units='in',res=300)
+png("FIGURES/PCAonAnnualRanges(noMCDN)_B.png",height=5,width=5,units='in',res=300)
 par(mar=c(3,3,0.2,0.2))
 par(mgp=c(1.5,0.4,0))
-plot(range.pca,xlab="PC 1 (35.3%)",ylab="PC 2 (25.9%)",type="n",axes=F,xlim=c(-0.5,2),ylim=c(-2,1.5))
+plot(range.pca,xlab="PC 1 (37.2%)",ylab="PC 2 (20.1%)",type="n",axes=F,xlim=c(-0.9,1.4),ylim=c(-1.8,1))
 axis(1,tck=0.015)
 axis(2,tck=0.015)
 box()
 
 # add points with site indicated by symbol and year by color (viridis color palette for years is names "colors")
 
-for (i in 1:length(unique(range.data$Site))){
-  for (j in 1:length(unique(range.data$water.year))){
-    points(as.vector(scores.range$sites[which(range.data$Site==unique(range.data$Site)[i]&range.data$water.year==unique(range.data$water.year)[j]),1]),as.vector(scores.range$sites[which(range.data$Site==unique(range.data$Site)[i]&range.data$water.year==unique(range.data$water.year)[j]),2]),pch=site.symbols[i],col=colors[j],bg=colors[j])
+for (i in 1:length(unique(range.minusMCDN$Site))){
+  for (j in 1:length(unique(range.minusMCDN$water.year))){
+    points(as.vector(scores.range$sites[which(range.minusMCDN$Site==unique(range.minusMCDN$Site)[i]&range.minusMCDN$water.year==unique(range.minusMCDN$water.year)[j]),1]),as.vector(scores.range$sites[which(range.minusMCDN$Site==unique(range.minusMCDN$Site)[i]&range.minusMCDN$water.year==unique(range.minusMCDN$water.year)[j]),2]),pch=site.symbols[i],col=colors[j],bg=colors[j])
   }
 }
 
-legend('bottomright',legend = unique(range.data$Site),pch=site.symbols,pt.bg = "black",bty='n',cex=0.9)
-gradient.rect(2,-0.7,2.6,-0.6,col=colors)
+legend('bottomleft',legend = unique(range.minusMCDN$Site),pch=site.symbols,pt.bg = "black",bty='n',cex=0.9)
+gradient.rect(-1.2,-0.8,-0.7,-0.7,col=colors)
 
-text(2,-0.57,"2000",adj=c(0,0),cex=0.7)
-text(2.6,-0.57,"2018",adj=c(1,0),cex=0.7)
+text(-1.2,-0.67,"2000",adj=c(0,0),cex=0.7)
+text(-0.7,-0.67,"2018",adj=c(1,0),cex=0.7)
 
 
 dev.off()
@@ -475,19 +546,21 @@ dev.off()
 
 
 #### 3. Annual maxima 
-max.pca<-rda(summary.data[,seq(from=4,by=3,length.out = 6)], scale=T)
-# PC1 explains 35.14% of the variation, PC2 explains 26.88% of the variation
+summary.minusMCDN<-filter(summary.data,Site!="MCDN") #remove the ag site from analysis
+
+max.pca<-rda(summary.minusMCDN[,seq(from=4,by=3,length.out = 6)], scale=T)
+# PC1 explains 36.79% of the variation, PC2 explains 20.54% of the variation
 
 scores.max<-scores(max.pca)
-row.names(scores.max$species)<-c("Cl","NO3","PO4","TP","TN","TP")
+row.names(scores.max$species)<-c("Cl","NO3","PO4","SO4","TN","TP")
 
 
 ## Biplot A: site by color with loadings
 
-png("FIGURES/PCAonAnnualMaxima_A.png",height=5,width=5,units='in',res=300)
+png("FIGURES/PCAonAnnualMaxima(noMCDN)_A.png",height=5,width=5,units='in',res=300)
 par(mar=c(3,3,0.2,0.2))
 par(mgp=c(1.5,0.4,0))
-plot(max.pca,xlab="PC 1 (35.1%)",ylab="PC 2 (26.9%)",type="n",axes=F,xlim=c(-1,2.2),ylim=c(-1,2.2))
+plot(max.pca,xlab="PC 1 (36.8%)",ylab="PC 2 (20.5%)",type="n",axes=F,xlim=c(-1,1.8),ylim=c(-1.8,2))
 axis(1,tck=0.02)
 axis(2,tck=0.02)
 box()
@@ -498,37 +571,37 @@ text(scores.max$species[,1]*Nudge,scores.max$species[,2]*Nudge,rownames(scores.m
 
 # add sites as colors
 
-for (i in 1:length(unique(summary.data$Site))){
-  points(as.vector(scores.max$sites[which(summary.data$Site==unique(summary.data$Site)[i]),1]),as.vector(scores.max$sites[which(summary.data$Site==unique(summary.data$Site)[i]),2]),col=site.colors[i])
+for (i in 1:length(unique(summary.minusMCDN$Site))){
+  points(as.vector(scores.max$sites[which(summary.minusMCDN$Site==unique(summary.minusMCDN$Site)[i]),1]),as.vector(scores.max$sites[which(summary.minusMCDN$Site==unique(summary.minusMCDN$Site)[i]),2]),col=site.colors[i])
 }
-legend('topright',legend = unique(summary.data$Site),col=site.colors,pch=1,pt.lwd=2)
+legend('topleft',legend = unique(summary.minusMCDN$Site),col=site.colors,pch=1,pt.lwd=2)
 
 dev.off()
 
 
 ## Biplot B: zoomed in with site by symbol and year by color
 
-png("FIGURES/PCAonAnnualMaxima_B.png",height=5,width=5,units='in',res=300)
+png("FIGURES/PCAonAnnualMaxima(noMCDN)_B.png",height=5,width=5,units='in',res=300)
 par(mar=c(3,3,0.2,0.2))
 par(mgp=c(1.5,0.4,0))
-plot(max.pca,xlab="PC 1 (35.1%)",ylab="PC 2 (26.9%)",type="n",axes=F,xlim=c(-1,2.2),ylim=c(-1,2.2))
+plot(max.pca,xlab="PC 1 (36.8%)",ylab="PC 2 (20.5%)",type="n",axes=F,xlim=c(-1,1.8),ylim=c(-1.8,2))
 axis(1,tck=0.02)
 axis(2,tck=0.02)
 box()
 
 # add points with site indicated by symbol and year by color (viridis color palette for years is names "colors")
 
-for (i in 1:length(unique(summary.data$Site))){
-  for (j in 1:length(unique(summary.data$water.year))){
-    points(as.vector(scores.max$sites[which(summary.data$Site==unique(summary.data$Site)[i]&summary.data$water.year==unique(summary.data$water.year)[j]),1]),as.vector(scores.max$sites[which(summary.data$Site==unique(summary.data$Site)[i]&summary.data$water.year==unique(summary.data$water.year)[j]),2]),pch=site.symbols[i],col=colors[j],bg=colors[j])
+for (i in 1:length(unique(summary.minusMCDN$Site))){
+  for (j in 1:length(unique(summary.minusMCDN$water.year))){
+    points(as.vector(scores.max$sites[which(summary.minusMCDN$Site==unique(summary.minusMCDN$Site)[i]&summary.minusMCDN$water.year==unique(summary.minusMCDN$water.year)[j]),1]),as.vector(scores.max$sites[which(summary.minusMCDN$Site==unique(summary.minusMCDN$Site)[i]&summary.minusMCDN$water.year==unique(summary.minusMCDN$water.year)[j]),2]),pch=site.symbols[i],col=colors[j],bg=colors[j])
   }
 }
 
-legend('topright',legend = unique(summary.data$Site),pch=site.symbols,pt.bg = "black",bty='n',cex=0.9)
-gradient.rect(1.75,1.05,2.3,0.95,col=colors)
+legend('topleft',legend = unique(summary.minusMCDN$Site),pch=site.symbols,pt.bg = "black",bty='n',cex=0.9)
+gradient.rect(-1.6,0.775,-0.9,0.65,col=colors)
 
-text(1.75,0.85,"2000",adj=c(0,0),cex=0.7)
-text(2.3,0.85,"2018",adj=c(1,0),cex=0.7)
+text(-1.6,0.55,"2000",adj=c(0,0),cex=0.7)
+text(-0.9,0.55,"2018",adj=c(1,0),cex=0.7)
 
 
 dev.off()
@@ -536,19 +609,19 @@ dev.off()
 
 
 #### 4. Annual minima 
-min.pca<-rda(summary.data[,seq(from=5,by=3,length.out = 6)], scale=T)
-# PC1 explains 54.98% of the variation, PC2 explains 21.11% of the variation
+min.pca<-rda(summary.minusMCDN[,seq(from=5,by=3,length.out = 6)], scale=T)
+# PC1 explains 40.73% of the variation, PC2 explains 28.38% of the variation
 
 scores.min<-scores(min.pca)
-row.names(scores.min$species)<-c("Cl","NO3","PO4","TP","TN","TP")
+row.names(scores.min$species)<-c("Cl","NO3","PO4","SO4","TN","TP")
 
 
 ## Biplot A: site by color with loadings
 
-png("FIGURES/PCAonAnnualMinima_A.png",height=5,width=5,units='in',res=300)
+png("FIGURES/PCAonAnnualMinima(noMCDN)_A.png",height=5,width=5,units='in',res=300)
 par(mar=c(3,3,0.2,0.2))
 par(mgp=c(1.5,0.4,0))
-plot(min.pca,xlab="PC 1 (55.0%)",ylab="PC 2 (21.1%)",type="n",axes=F,xlim=c(-2.2,1),ylim=c(-2.2,1))
+plot(min.pca,xlab="PC 1 (40.7%)",ylab="PC 2 (28.4%)",type="n",axes=F,xlim=c(-1,2),ylim=c(-1.5,1.75))
 axis(1,tck=0.02)
 axis(2,tck=0.02)
 box()
@@ -559,37 +632,97 @@ text(scores.min$species[,1]*Nudge,scores.min$species[,2]*Nudge,rownames(scores.m
 
 # add sites as colors
 
-for (i in 1:length(unique(summary.data$Site))){
-  points(as.vector(scores.min$sites[which(summary.data$Site==unique(summary.data$Site)[i]),1]),as.vector(scores.min$sites[which(summary.data$Site==unique(summary.data$Site)[i]),2]),col=site.colors[i])
+for (i in 1:length(unique(summary.minusMCDN$Site))){
+  points(as.vector(scores.min$sites[which(summary.minusMCDN$Site==unique(summary.minusMCDN$Site)[i]),1]),as.vector(scores.min$sites[which(summary.minusMCDN$Site==unique(summary.minusMCDN$Site)[i]),2]),col=site.colors[i])
 }
-legend('topright',legend = unique(summary.data$Site),col=site.colors,pch=1,pt.lwd=2)
+legend('bottomleft',legend = unique(summary.minusMCDN$Site),col=site.colors,pch=1,pt.lwd=2)
 
 dev.off()
 
 
 ## Biplot B: zoomed in with site by symbol and year by color
 
-png("FIGURES/PCAonAnnualMinima_B.png",height=5,width=5,units='in',res=300)
+png("FIGURES/PCAonAnnualMinima(noMCDN)_B.png",height=5,width=5,units='in',res=300)
 par(mar=c(3,3,0.2,0.2))
 par(mgp=c(1.5,0.4,0))
-plot(min.pca,xlab="PC 1 (55.0%)",ylab="PC 2 (21.1%)",type="n",axes=F,xlim=c(-2,1),ylim=c(-1.75,1))
+plot(min.pca,xlab="PC 1 (40.7%)",ylab="PC 2 (28.4%)",type="n",axes=F,xlim=c(-1,1.75),ylim=c(-0.8,1.5))
 axis(1,tck=0.02)
 axis(2,tck=0.02)
 box()
 
 # add points with site indicated by symbol and year by color (viridis color palette for years is names "colors")
 
-for (i in 1:length(unique(summary.data$Site))){
-  for (j in 1:length(unique(summary.data$water.year))){
-    points(as.vector(scores.min$sites[which(summary.data$Site==unique(summary.data$Site)[i]&summary.data$water.year==unique(summary.data$water.year)[j]),1]),as.vector(scores.min$sites[which(summary.data$Site==unique(summary.data$Site)[i]&summary.data$water.year==unique(summary.data$water.year)[j]),2]),pch=site.symbols[i],col=colors[j],bg=colors[j])
+for (i in 1:length(unique(summary.minusMCDN$Site))){
+  for (j in 1:length(unique(summary.minusMCDN$water.year))){
+    points(as.vector(scores.min$sites[which(summary.minusMCDN$Site==unique(summary.minusMCDN$Site)[i]&summary.minusMCDN$water.year==unique(summary.minusMCDN$water.year)[j]),1]),as.vector(scores.min$sites[which(summary.minusMCDN$Site==unique(summary.minusMCDN$Site)[i]&summary.minusMCDN$water.year==unique(summary.minusMCDN$water.year)[j]),2]),pch=site.symbols[i],col=colors[j],bg=colors[j])
   }
 }
 
-legend('topright',legend = unique(summary.data$Site),pch=site.symbols,pt.bg = "black",bty='n',cex=0.9)
-gradient.rect(1.75,1.05,2.3,0.95,col=colors)
+legend('bottomleft',legend = unique(summary.minusMCDN$Site),pch=site.symbols,pt.bg = "black",bty='n',cex=0.9)
+gradient.rect(-0.55,-1.05,-0.05,-0.95,col=colors)
 
-text(1.75,0.85,"2000",adj=c(0,0),cex=0.7)
-text(2.3,0.85,"2018",adj=c(1,0),cex=0.7)
+text(-0.55,-0.9,"2000",adj=c(0,0),cex=0.7)
+text(-0.05,-0.9,"2018",adj=c(1,0),cex=0.7)
+
+
+dev.off()
+
+
+#### 5. Annual C-Q relationships
+min.pca<-rda(summary.minusMCDN[,seq(from=5,by=3,length.out = 6)], scale=T)
+# PC1 explains 40.73% of the variation, PC2 explains 28.38% of the variation
+
+scores.min<-scores(min.pca)
+row.names(scores.min$species)<-c("Cl","NO3","PO4","SO4","TN","TP")
+
+
+## Biplot A: site by color with loadings
+
+png("FIGURES/PCAonAnnualMinima(noMCDN)_A.png",height=5,width=5,units='in',res=300)
+par(mar=c(3,3,0.2,0.2))
+par(mgp=c(1.5,0.4,0))
+plot(min.pca,xlab="PC 1 (40.7%)",ylab="PC 2 (28.4%)",type="n",axes=F,xlim=c(-1,2),ylim=c(-1.5,1.75))
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+
+arrows(0,0,scores.min$species[,1],scores.min$species[,2],length=0.1,angle=30)
+Nudge<-1.05
+text(scores.min$species[,1]*Nudge,scores.min$species[,2]*Nudge,rownames(scores.min$species),cex=0.8,font=2)
+
+# add sites as colors
+
+for (i in 1:length(unique(summary.minusMCDN$Site))){
+  points(as.vector(scores.min$sites[which(summary.minusMCDN$Site==unique(summary.minusMCDN$Site)[i]),1]),as.vector(scores.min$sites[which(summary.minusMCDN$Site==unique(summary.minusMCDN$Site)[i]),2]),col=site.colors[i])
+}
+legend('bottomleft',legend = unique(summary.minusMCDN$Site),col=site.colors,pch=1,pt.lwd=2)
+
+dev.off()
+
+
+## Biplot B: zoomed in with site by symbol and year by color
+
+png("FIGURES/PCAonAnnualMinima(noMCDN)_B.png",height=5,width=5,units='in',res=300)
+par(mar=c(3,3,0.2,0.2))
+par(mgp=c(1.5,0.4,0))
+plot(min.pca,xlab="PC 1 (40.7%)",ylab="PC 2 (28.4%)",type="n",axes=F,xlim=c(-1,1.75),ylim=c(-0.8,1.5))
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+
+# add points with site indicated by symbol and year by color (viridis color palette for years is names "colors")
+
+for (i in 1:length(unique(summary.minusMCDN$Site))){
+  for (j in 1:length(unique(summary.minusMCDN$water.year))){
+    points(as.vector(scores.min$sites[which(summary.minusMCDN$Site==unique(summary.minusMCDN$Site)[i]&summary.minusMCDN$water.year==unique(summary.minusMCDN$water.year)[j]),1]),as.vector(scores.min$sites[which(summary.minusMCDN$Site==unique(summary.minusMCDN$Site)[i]&summary.minusMCDN$water.year==unique(summary.minusMCDN$water.year)[j]),2]),pch=site.symbols[i],col=colors[j],bg=colors[j])
+  }
+}
+
+legend('bottomleft',legend = unique(summary.minusMCDN$Site),pch=site.symbols,pt.bg = "black",bty='n',cex=0.9)
+gradient.rect(-0.55,-1.05,-0.05,-0.95,col=colors)
+
+text(-0.55,-0.9,"2000",adj=c(0,0),cex=0.7)
+text(-0.05,-0.9,"2018",adj=c(1,0),cex=0.7)
 
 
 dev.off()
