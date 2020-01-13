@@ -176,6 +176,47 @@ BESflow$Date<-ymd(BESflow$Date)
 BESflow$meanDailyQ_Ls<-BESflow$meanDailyQ_cfs*28.3168
 
 
+#############################################
+###      Summarize NOAA climate data      ###
+#############################################
+
+#load in precip data and sum over water year.
+NOAA<-read.csv("BWI_temp+rainfall.csv",header = T)
+
+#add a water year column
+NOAA$water.year<-rep(NA, nrow(NOAA))
+
+# determine the water year
+for(i in 1:length(NOAA$water.year)){
+  if(ymd(NOAA$DATE[i])>=ymd(paste0(year(NOAA$DATE[i]),"-10-01"))){
+    NOAA$water.year[i]=year(NOAA$DATE[i])+1
+  }
+  else{
+    NOAA$water.year[i]=year(NOAA$DATE[i])
+  }
+}
+
+# summarize precip by water year
+
+BWI.annualprecip<- NOAA %>% group_by(water.year) %>% 
+  summarise(annual.precip = sum(PRCP))
+
+
+#compare to precip summaries from Nutrient_bacter dataset to verify - they look the same. Neat.
+Woytowitz.climate<-read.csv("Nutrient_bacter/GwynnsFalls_Climate.csv",header = T)
+
+
+#plot precip vs. water year
+png("FIGURES/Precipvsyear.png",height=3,width=5,units='in',res=300)
+par(mar=c(3,3,0.2,0.2))
+par(mgp=c(1.5,0.4,0))
+plot(annual.precip~water.year,data=filter(BWI.annualprecip,water.year!=2020),ylab="Annual Precip (cm)",xlab="water year",pch=16,axes=F,type="b")
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+dev.off()
+
+
 ###########################################
 ###      Annual C-Q relationships       ###
 ###########################################
@@ -534,7 +575,7 @@ site.symbols<-c(3,16,25,15,24,18,1,4)
 
 
 
-#### 1. Annual means 
+#### 1. Annual means ####
 means.minusMCDN<-filter(means.lulc,Site!="MCDN") #remove the ag site from analysis
 
 mean.pca<-rda(means.minusMCDN[,3:8], scale=T)
@@ -595,6 +636,107 @@ text(-0.85,-0.57,"2018",adj=c(1,0),cex=0.7)
 
 dev.off()
 
+### PC scores over time and vs. potential drivers
+
+## By water year
+png("FIGURES/MeansPC1vsyear.png",height=2.5,width=5,units='in',res=300)
+par(mar=c(3,3,0.2,4))
+par(mgp=c(1.5,0.4,0))
+par(xpd=TRUE)
+plot(as.vector(scores.mean$sites[,1])~means.minusMCDN$water.year,ylab="Score on PC 1",xlab="water year",type="n",axes=F)
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+# add sites as colors
+for (i in 1:length(unique(means.minusMCDN$Site))){
+  points(as.vector(means.minusMCDN$water.year[which(means.minusMCDN$Site==unique(means.minusMCDN$Site)[i])]),as.vector(scores.mean$sites[which(means.minusMCDN$Site==unique(means.minusMCDN$Site)[i]),1]),col=site.colors[i],pch=16,type="b")
+}
+legend(2019,1,legend = unique(means.minusMCDN$Site),col=site.colors,pch=16,cex=0.8,bty="n")
+dev.off()
+
+#png("FIGURES/MeansPC2vsyear.png",height=2.5,width=5,units='in',res=300)
+par(mar=c(3,3,0.2,4))
+par(mgp=c(1.5,0.4,0))
+par(xpd=TRUE)
+plot(as.vector(scores.mean$sites[,2])~means.minusMCDN$water.year,ylab="Score on PC 2",xlab="water year",type="n",axes=F)
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+# add sites as colors
+for (i in 1:length(unique(means.minusMCDN$Site))){
+  points(as.vector(means.minusMCDN$water.year[which(means.minusMCDN$Site==unique(means.minusMCDN$Site)[i])]),as.vector(scores.mean$sites[which(means.minusMCDN$Site==unique(means.minusMCDN$Site)[i]),2]),col=site.colors[i],pch=16,type="b")
+}
+legend(2019,0,legend = unique(means.minusMCDN$Site),col=site.colors,pch=16,cex=0.8,bty="n")
+#dev.off()
+
+## Vs. annual precip
+means.precip<-left_join(means.minusMCDN,BWI.annualprecip,by="water.year")
+meansPC1.precip.lms<-data.frame(Site=unique(means.minusMCDN$Site),
+                                pval=rep(NA,times=length(unique(means.minusMCDN$Site))),
+                                slope=rep(NA,times=length(unique(means.minusMCDN$Site))),
+                                int=rep(NA,times=length(unique(means.minusMCDN$Site))),
+                                r2=rep(NA,times=length(unique(means.minusMCDN$Site))))
+for (i in 1:length(unique(means.minusMCDN$Site))){
+  meansPC1.precip.lm<-lm(as.vector(scores.mean$sites[which(means.minusMCDN$Site==unique(means.minusMCDN$Site)[i]),1])~as.vector(means.precip$annual.precip[which(means.precip$Site==unique(means.precip$Site)[i])]))
+  meansPC1.precip.lms$Site[i]<-unique(means.minusMCDN$Site)[i]
+  meansPC1.precip.lms$pval[i]<-lmp(meansPC1.precip.lm)
+  meansPC1.precip.lms$slope[i]<-summary(meansPC1.precip.lm)$coefficients[2]
+  meansPC1.precip.lms$int[i]<-summary(meansPC1.precip.lm)$coefficients[1]
+  meansPC1.precip.lms$r2[i]<-summary(meansPC1.precip.lm)$adj.r.squared
+}
+png("FIGURES/MeansPC1vsprecip.png",height=3,width=3.5,units='in',res=300)
+par(mar=c(3,3,0.2,0.2))
+par(mgp=c(1.5,0.4,0))
+par(xpd=F)
+plot(as.vector(scores.mean$sites[,1])~means.precip$annual.precip,ylab="Score on PC 1",xlab="annual precip (cm)",type="n",axes=F)
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+# add sites as colors
+for (i in 1:length(unique(means.minusMCDN$Site))){
+  points(as.vector(means.precip$annual.precip[which(means.precip$Site==unique(means.precip$Site)[i])]),
+         as.vector(scores.mean$sites[which(means.minusMCDN$Site==unique(means.minusMCDN$Site)[i]),1]),
+         col=site.colors[i],pch=16)
+  if(meansPC1.precip.lms$pval[i]<0.055){
+    abline(meansPC1.precip.lms$int[i],meansPC1.precip.lms$slope[i],col=site.colors[i])
+  }
+}
+
+legend(63,1,legend = unique(means.minusMCDN$Site),col=site.colors,pch=16,cex=0.8,bty="n")
+dev.off()
+
+
+meansPC2.precip.lms<-data.frame(Site=unique(means.minusMCDN$Site),
+                                pval=rep(NA,times=length(unique(means.minusMCDN$Site))),
+                                slope=rep(NA,times=length(unique(means.minusMCDN$Site))),
+                                int=rep(NA,times=length(unique(means.minusMCDN$Site))),
+                                r2=rep(NA,times=length(unique(means.minusMCDN$Site))))
+for (i in 1:length(unique(means.minusMCDN$Site))){
+  meansPC2.precip.lm<-lm(as.vector(scores.mean$sites[which(means.minusMCDN$Site==unique(means.minusMCDN$Site)[i]),2])~as.vector(means.precip$annual.precip[which(means.precip$Site==unique(means.precip$Site)[i])]))
+  meansPC2.precip.lms$Site[i]<-unique(means.minusMCDN$Site)[i]
+  meansPC2.precip.lms$pval[i]<-lmp(meansPC2.precip.lm)
+  meansPC2.precip.lms$slope[i]<-summary(meansPC2.precip.lm)$coefficients[2]
+  meansPC2.precip.lms$int[i]<-summary(meansPC2.precip.lm)$coefficients[1]
+  meansPC2.precip.lms$r2[i]<-summary(meansPC2.precip.lm)$adj.r.squared
+}
+#png("FIGURES/MeansPC2vsprecip.png",height=3,width=3.5,units='in',res=300)
+par(mar=c(3,3,0.2,0.2))
+par(mgp=c(1.5,0.4,0))
+par(xpd=F)
+plot(as.vector(scores.mean$sites[,2])~means.precip$annual.precip,ylab="Score on PC 2",xlab="annual precip (cm)",type="n",axes=F)
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+# add sites as colors
+for (i in 1:length(unique(means.minusMCDN$Site))){
+  points(as.vector(means.precip$annual.precip[which(means.precip$Site==unique(means.precip$Site)[i])]),
+         as.vector(scores.mean$sites[which(means.minusMCDN$Site==unique(means.minusMCDN$Site)[i]),2]),
+         col=site.colors[i],pch=16)
+  if(meansPC2.precip.lms$pval[i]<0.055){
+    abline(meansPC2.precip.lms$int[i],meansPC2.precip.lms$slope[i],col=site.colors[i])
+  }
+}
+#dev.off()
 
 
 #### 2. Annual range 
@@ -659,6 +801,60 @@ text(-0.7,-0.67,"2018",adj=c(1,0),cex=0.7)
 dev.off()
 
 
+### PC scores over time and vs. potential drivers
+
+## By water year
+png("FIGURES/RangesPC1vsyear.png",height=2.5,width=5,units='in',res=300)
+
+par(mar=c(3,3,0.2,4))
+par(mgp=c(1.5,0.4,0))
+par(xpd=TRUE)
+plot(as.vector(scores.range$sites[,1])~range.minusMCDN$water.year,ylab="Score on PC 1",xlab="water year",type="n",axes=F)
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+# add sites as colors
+for (i in 1:length(unique(range.minusMCDN$Site))){
+  points(as.vector(range.minusMCDN$water.year[which(range.minusMCDN$Site==unique(range.minusMCDN$Site)[i])]),as.vector(scores.range$sites[which(range.minusMCDN$Site==unique(range.minusMCDN$Site)[i]),1]),col=site.colors[i],pch=16,type="b")
+}
+legend(2019,1,legend = unique(range.minusMCDN$Site),col=site.colors,pch=16,cex=0.8,bty="n")
+dev.off()
+
+
+## Vs. annual precip
+range.precip<-left_join(range.minusMCDN,BWI.annualprecip,by="water.year")
+rangePC1.precip.lms<-data.frame(Site=unique(range.minusMCDN$Site),
+                                pval=rep(NA,times=length(unique(range.minusMCDN$Site))),
+                                slope=rep(NA,times=length(unique(range.minusMCDN$Site))),
+                                int=rep(NA,times=length(unique(range.minusMCDN$Site))),
+                                r2=rep(NA,times=length(unique(range.minusMCDN$Site))))
+for (i in 1:length(unique(range.minusMCDN$Site))){
+  rangePC.precip.lm<-lm(as.vector(scores.range$sites[which(range.minusMCDN$Site==unique(range.minusMCDN$Site)[i]),1])~as.vector(range.precip$annual.precip[which(range.precip$Site==unique(range.precip$Site)[i])]))
+  rangePC1.precip.lms$Site[i]<-unique(range.minusMCDN$Site)[i]
+  rangePC1.precip.lms$pval[i]<-lmp(rangePC.precip.lm)
+  rangePC1.precip.lms$slope[i]<-summary(rangePC.precip.lm)$coefficients[2]
+  rangePC1.precip.lms$int[i]<-summary(rangePC.precip.lm)$coefficients[1]
+  rangePC1.precip.lms$r2[i]<-summary(rangePC.precip.lm)$adj.r.squared
+}
+png("FIGURES/rangePC1vsprecip.png",height=3,width=3.5,units='in',res=300)
+par(mar=c(3,3,0.2,0.2))
+par(mgp=c(1.5,0.4,0))
+par(xpd=F)
+plot(as.vector(scores.range$sites[,1])~range.precip$annual.precip,ylab="Score on PC 1",xlab="annual precip (cm)",type="n",axes=F)
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+# add sites as colors
+for (i in 1:length(unique(range.minusMCDN$Site))){
+  points(as.vector(range.precip$annual.precip[which(range.precip$Site==unique(range.precip$Site)[i])]),
+         as.vector(scores.range$sites[which(range.minusMCDN$Site==unique(range.minusMCDN$Site)[i]),1]),
+         col=site.colors[i],pch=16)
+  if(rangePC1.precip.lms$pval[i]<0.055){
+    abline(rangePC1.precip.lms$int[i],rangePC1.precip.lms$slope[i],col=site.colors[i])
+  }
+}
+dev.off()
+
 
 
 #### 3. Annual maxima 
@@ -719,7 +915,60 @@ gradient.rect(-1.6,0.775,-0.9,0.65,col=colors)
 text(-1.6,0.55,"2000",adj=c(0,0),cex=0.7)
 text(-0.9,0.55,"2018",adj=c(1,0),cex=0.7)
 
+dev.off()
 
+### PC scores over time and vs. potential drivers
+
+## By water year
+png("FIGURES/maxsPC1vsyear.png",height=2.5,width=5,units='in',res=300)
+
+par(mar=c(3,3,0.2,4))
+par(mgp=c(1.5,0.4,0))
+par(xpd=TRUE)
+plot(as.vector(scores.max$sites[,1])~summary.minusMCDN$water.year,ylab="Score on PC 1",xlab="water year",type="n",axes=F)
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+# add sites as colors
+for (i in 1:length(unique(summary.minusMCDN$Site))){
+  points(as.vector(summary.minusMCDN$water.year[which(summary.minusMCDN$Site==unique(summary.minusMCDN$Site)[i])]),as.vector(scores.max$sites[which(summary.minusMCDN$Site==unique(summary.minusMCDN$Site)[i]),1]),col=site.colors[i],pch=16,type="b")
+}
+legend(2019,1,legend = unique(summary.minusMCDN$Site),col=site.colors,pch=16,cex=0.8,bty="n")
+dev.off()
+
+
+## Vs. annual precip
+summary.precip<-left_join(summary.minusMCDN,BWI.annualprecip,by="water.year")
+maxPC1.precip.lms<-data.frame(Site=unique(summary.minusMCDN$Site),
+                                pval=rep(NA,times=length(unique(summary.minusMCDN$Site))),
+                                slope=rep(NA,times=length(unique(summary.minusMCDN$Site))),
+                                int=rep(NA,times=length(unique(summary.minusMCDN$Site))),
+                                r2=rep(NA,times=length(unique(summary.minusMCDN$Site))))
+for (i in 1:length(unique(summary.minusMCDN$Site))){
+  maxPC.precip.lm<-lm(as.vector(scores.max$sites[which(summary.minusMCDN$Site==unique(summary.minusMCDN$Site)[i]),1])~as.vector(summary.precip$annual.precip[which(summary.precip$Site==unique(summary.precip$Site)[i])]))
+  maxPC1.precip.lms$Site[i]<-unique(summary.minusMCDN$Site)[i]
+  maxPC1.precip.lms$pval[i]<-lmp(maxPC.precip.lm)
+  maxPC1.precip.lms$slope[i]<-summary(maxPC.precip.lm)$coefficients[2]
+  maxPC1.precip.lms$int[i]<-summary(maxPC.precip.lm)$coefficients[1]
+  maxPC1.precip.lms$r2[i]<-summary(maxPC.precip.lm)$adj.r.squared
+}
+png("FIGURES/maxPC1vsprecip.png",height=3,width=3.5,units='in',res=300)
+par(mar=c(3,3,0.2,0.2))
+par(mgp=c(1.5,0.4,0))
+par(xpd=F)
+plot(as.vector(scores.max$sites[,1])~summary.precip$annual.precip,ylab="Score on PC 1",xlab="annual precip (cm)",type="n",axes=F)
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+# add sites as colors
+for (i in 1:length(unique(range.minusMCDN$Site))){
+  points(as.vector(summary.precip$annual.precip[which(summary.precip$Site==unique(summary.precip$Site)[i])]),
+         as.vector(scores.max$sites[which(range.minusMCDN$Site==unique(range.minusMCDN$Site)[i]),1]),
+         col=site.colors[i],pch=16)
+  if(maxPC1.precip.lms$pval[i]<0.055){
+    abline(maxPC1.precip.lms$int[i],maxPC1.precip.lms$slope[i],col=site.colors[i])
+  }
+}
 dev.off()
 
 
@@ -780,8 +1029,62 @@ gradient.rect(-0.55,-1.05,-0.05,-0.95,col=colors)
 text(-0.55,-0.9,"2000",adj=c(0,0),cex=0.7)
 text(-0.05,-0.9,"2018",adj=c(1,0),cex=0.7)
 
-
 dev.off()
+
+### PC scores over time and vs. potential drivers
+
+## By water year
+png("FIGURES/minsPC1vsyear.png",height=2.5,width=5,units='in',res=300)
+
+par(mar=c(3,3,0.2,4))
+par(mgp=c(1.5,0.4,0))
+par(xpd=TRUE)
+plot(as.vector(scores.min$sites[,1])~summary.minusMCDN$water.year,ylab="Score on PC 1",xlab="water year",type="n",axes=F)
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+# add sites as colors
+for (i in 1:length(unique(summary.minusMCDN$Site))){
+  points(as.vector(summary.minusMCDN$water.year[which(summary.minusMCDN$Site==unique(summary.minusMCDN$Site)[i])]),as.vector(scores.min$sites[which(summary.minusMCDN$Site==unique(summary.minusMCDN$Site)[i]),1]),col=site.colors[i],pch=16,type="b")
+}
+legend(2019,1,legend = unique(summary.minusMCDN$Site),col=site.colors,pch=16,cex=0.8,bty="n")
+dev.off()
+
+
+## Vs. annual precip
+summary.precip<-left_join(summary.minusMCDN,BWI.annualprecip,by="water.year")
+minPC1.precip.lms<-data.frame(Site=unique(summary.minusMCDN$Site),
+                              pval=rep(NA,times=length(unique(summary.minusMCDN$Site))),
+                              slope=rep(NA,times=length(unique(summary.minusMCDN$Site))),
+                              int=rep(NA,times=length(unique(summary.minusMCDN$Site))),
+                              r2=rep(NA,times=length(unique(summary.minusMCDN$Site))))
+for (i in 1:length(unique(summary.minusMCDN$Site))){
+  minPC.precip.lm<-lm(as.vector(scores.min$sites[which(summary.minusMCDN$Site==unique(summary.minusMCDN$Site)[i]),1])~as.vector(summary.precip$annual.precip[which(summary.precip$Site==unique(summary.precip$Site)[i])]))
+  minPC1.precip.lms$Site[i]<-unique(summary.minusMCDN$Site)[i]
+  minPC1.precip.lms$pval[i]<-lmp(minPC.precip.lm)
+  minPC1.precip.lms$slope[i]<-summary(minPC.precip.lm)$coefficients[2]
+  minPC1.precip.lms$int[i]<-summary(minPC.precip.lm)$coefficients[1]
+  minPC1.precip.lms$r2[i]<-summary(minPC.precip.lm)$adj.r.squared
+}
+png("FIGURES/minPC1vsprecip.png",height=3,width=3.5,units='in',res=300)
+par(mar=c(3,3,0.2,0.2))
+par(mgp=c(1.5,0.4,0))
+par(xpd=F)
+plot(as.vector(scores.min$sites[,1])~summary.precip$annual.precip,ylab="Score on PC 1",xlab="annual precip (cm)",type="n",axes=F)
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+# add sites as colors
+for (i in 1:length(unique(range.minusMCDN$Site))){
+  points(as.vector(summary.precip$annual.precip[which(summary.precip$Site==unique(summary.precip$Site)[i])]),
+         as.vector(scores.min$sites[which(range.minusMCDN$Site==unique(range.minusMCDN$Site)[i]),1]),
+         col=site.colors[i],pch=16)
+  if(minPC1.precip.lms$pval[i]<0.055){
+    abline(minPC1.precip.lms$int[i],minPC1.precip.lms$slope[i],col=site.colors[i])
+  }
+}
+dev.off()
+
 
 
 #### 5. Annual C-Q slopes (not including POBR or MCDN and omitting TP and PO4 data)
@@ -812,9 +1115,9 @@ text(scores.CQ$species[,1]*Nudge,scores.CQ$species[,2]*Nudge,rownames(scores.CQ$
 # add sites as colors
 
 for (i in 1:length(unique(annualCQforPCA$Site))){
-  points(as.vector(scores.CQ$sites[which(annualCQforPCA$Site==unique(annualCQforPCA$Site)[i]),1]),as.vector(scores.CQ$sites[which(annualCQforPCA$Site==unique(annualCQforPCA$Site)[i]),2]),col=site.colors[i])
+  points(as.vector(scores.CQ$sites[which(annualCQforPCA$Site==unique(annualCQforPCA$Site)[i]),1]),as.vector(scores.CQ$sites[which(annualCQforPCA$Site==unique(annualCQforPCA$Site)[i]),2]),col=site.colors[i+1])
 }
-legend('bottomright',legend = unique(annualCQforPCA$Site),col=site.colors,pch=1,pt.lwd=2)
+legend('bottomright',legend = unique(annualCQforPCA$Site),col=site.colors[2:7],pch=1,pt.lwd=2)
 
 dev.off()
 
@@ -833,23 +1136,124 @@ box()
 
 for (i in 1:length(unique(annualCQforPCA$Site))){
   for (j in 1:length(unique(annualCQforPCA$water.year))){
-    points(as.vector(scores.CQ$sites[which(annualCQforPCA$Site==unique(annualCQforPCA$Site)[i]&annualCQforPCA$water.year==unique(annualCQforPCA$water.year)[j]),1]),as.vector(scores.CQ$sites[which(annualCQforPCA$Site==unique(annualCQforPCA$Site)[i]&annualCQforPCA$water.year==unique(annualCQforPCA$water.year)[j]),2]),pch=site.symbols[i],col=colors[j],bg=colors[j])
+    points(as.vector(scores.CQ$sites[which(annualCQforPCA$Site==unique(annualCQforPCA$Site)[i]&annualCQforPCA$water.year==unique(annualCQforPCA$water.year)[j]),1]),as.vector(scores.CQ$sites[which(annualCQforPCA$Site==unique(annualCQforPCA$Site)[i]&annualCQforPCA$water.year==unique(annualCQforPCA$water.year)[j]),2]),pch=site.symbols[i+1],col=colors[j],bg=colors[j])
   }
 }
 
-legend('bottomright',legend = unique(annualCQforPCA$Site),pch=site.symbols,pt.bg = "black",bty='n',cex=0.9)
+legend('bottomright',legend = unique(annualCQforPCA$Site),pch=site.symbols[2:7],pt.bg = "black",bty='n',cex=0.9)
 gradient.rect(1.4,-0.7,2,-0.6,col=colors)
 
 text(1.4,-0.55,"2000",adj=c(0,0),cex=0.7)
 text(2,-0.55,"2018",adj=c(1,0),cex=0.7)
 
-
 dev.off()
+
+### PC scores over time and vs. potential drivers
+
+## By water year
+png("FIGURES/CQsPC1vsyear.png",height=2.5,width=5,units='in',res=300)
+par(mar=c(3,3,0.2,4))
+par(mgp=c(1.5,0.4,0))
+par(xpd=TRUE)
+plot(as.vector(scores.CQ$sites[,1])~annualCQforPCA$water.year,ylab="Score on PC 1",xlab="water year",type="n",axes=F)
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+# add sites as colors
+for (i in 1:length(unique(annualCQforPCA$Site))){
+  points(as.vector(annualCQforPCA$water.year[which(annualCQforPCA$Site==unique(annualCQforPCA$Site)[i])]),as.vector(scores.CQ$sites[which(annualCQforPCA$Site==unique(annualCQforPCA$Site)[i]),1]),col=site.colors[i+1],pch=16,type="b")
+}
+legend(2019,1,legend = unique(annualCQforPCA$Site),col=site.colors[2:7],pch=16,cex=0.8,bty="n")
+dev.off()
+
+
+png("FIGURES/CQsPC2vsyear.png",height=2.5,width=5,units='in',res=300)
+par(mar=c(3,3,0.2,4))
+par(mgp=c(1.5,0.4,0))
+par(xpd=TRUE)
+plot(as.vector(scores.CQ$sites[,2])~annualCQforPCA$water.year,ylab="Score on PC 2",xlab="water year",type="n",axes=F)
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+# add sites as colors
+for (i in 1:length(unique(annualCQforPCA$Site))){
+  points(as.vector(annualCQforPCA$water.year[which(annualCQforPCA$Site==unique(annualCQforPCA$Site)[i])]),as.vector(scores.CQ$sites[which(annualCQforPCA$Site==unique(annualCQforPCA$Site)[i]),2]),col=site.colors[i+1],pch=16,type="b")
+}
+legend(2019,0,legend = unique(annualCQforPCA$Site),col=site.colors[2:7],pch=16,cex=0.8,bty="n")
+dev.off()
+
+## Vs. annual precip
+CQ.precip<-left_join(annualCQforPCA,BWI.annualprecip,by="water.year")
+CQPC1.precip.lms<-data.frame(Site=unique(CQ.precip$Site),
+                                 pval=rep(NA,times=length(unique(CQ.precip$Site))),
+                                 slope=rep(NA,times=length(unique(CQ.precip$Site))),
+                                 int=rep(NA,times=length(unique(CQ.precip$Site))),
+                                 r2=rep(NA,times=length(unique(CQ.precip$Site))))
+for (i in 1:length(unique(CQ.precip$Site))){
+  CQPC1.precip.lm<-lm(as.vector(scores.CQ$sites[which(CQ.precip$Site==unique(CQ.precip$Site)[i]),1])~as.vector(CQ.precip$annual.precip[which(CQ.precip$Site==unique(CQ.precip$Site)[i])]))
+  CQPC1.precip.lms$Site[i]<-unique(CQ.precip$Site)[i]
+  CQPC1.precip.lms$pval[i]<-lmp(CQPC1.precip.lm)
+  CQPC1.precip.lms$slope[i]<-summary(CQPC1.precip.lm)$coefficients[2]
+  CQPC1.precip.lms$int[i]<-summary(CQPC1.precip.lm)$coefficients[1]
+  CQPC1.precip.lms$r2[i]<-summary(CQPC1.precip.lm)$adj.r.squared
+}
+png("FIGURES/CQPC1vsprecip.png",height=3,width=3.5,units='in',res=300)
+par(mar=c(3,3,0.2,0.2))
+par(mgp=c(1.5,0.4,0))
+par(xpd=F)
+plot(as.vector(scores.CQ$sites[,1])~CQ.precip$annual.precip,ylab="Score on PC 1",xlab="annual precip (cm)",type="n",axes=F)
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+# add sites as colors
+for (i in 1:length(unique(CQ.precip$Site))){
+  points(as.vector(CQ.precip$annual.precip[which(CQ.precip$Site==unique(CQ.precip$Site)[i])]),
+         as.vector(scores.CQ$sites[which(CQ.precip$Site==unique(CQ.precip$Site)[i]),1]),
+         col=site.colors[i+1],pch=16)
+  if(CQPC1.precip.lms$pval[i]<0.055){
+    abline(CQPC1.precip.lms$int[i],CQPC1.precip.lms$slope[i],col=site.colors[i])
+  }
+}
+dev.off()
+
+
+CQPC2.precip.lms<-data.frame(Site=unique(CQ.precip$Site),
+                                 pval=rep(NA,times=length(unique(CQ.precip$Site))),
+                                 slope=rep(NA,times=length(unique(CQ.precip$Site))),
+                                 int=rep(NA,times=length(unique(CQ.precip$Site))),
+                                 r2=rep(NA,times=length(unique(CQ.precip$Site))))
+for (i in 1:length(unique(CQ.precip$Site))){
+  CQPC2.precip.lm<-lm(as.vector(scores.CQ$sites[which(CQ.precip$Site==unique(CQ.precip$Site)[i]),2])~as.vector(CQ.precip$annual.precip[which(CQ.precip$Site==unique(CQ.precip$Site)[i])]))
+  CQPC2.precip.lms$Site[i]<-unique(CQ.precip$Site)[i]
+  CQPC2.precip.lms$pval[i]<-lmp(CQPC2.precip.lm)
+  CQPC2.precip.lms$slope[i]<-summary(CQPC2.precip.lm)$coefficients[2]
+  CQPC2.precip.lms$int[i]<-summary(CQPC2.precip.lm)$coefficients[1]
+  CQPC2.precip.lms$r2[i]<-summary(CQPC2.precip.lm)$adj.r.squared
+}
+png("FIGURES/CQPC2vsprecip.png",height=3,width=3.5,units='in',res=300)
+par(mar=c(3,3,0.2,0.2))
+par(mgp=c(1.5,0.4,0))
+par(xpd=F)
+plot(as.vector(scores.CQ$sites[,2])~CQ.precip$annual.precip,ylab="Score on PC 2",xlab="annual precip (cm)",type="n",axes=F)
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+# add sites as colors
+for (i in 1:length(unique(CQ.precip$Site))){
+  points(as.vector(CQ.precip$annual.precip[which(CQ.precip$Site==unique(CQ.precip$Site)[i])]),
+         as.vector(scores.CQ$sites[which(CQ.precip$Site==unique(CQ.precip$Site)[i]),2]),
+         col=site.colors[i+1],pch=16)
+  if(CQPC2.precip.lms$pval[i]<0.055){
+    abline(CQPC2.precip.lms$int[i],CQPC2.precip.lms$slope[i],col=site.colors[i])
+  }
+}
+dev.off()
+
+
 
 
 #### 6. Annual CVs of solute concentrations
 annualconcCVforPCA<-filter(annualCVratios,is.na(Cl.CV)==F & is.na(NO3.CV)==F & is.na(SO4.CV)==F & is.na(TN.CV)==F & is.na(TP.CV)==F & is.na(PO4.CV)==F)
-
 
 concCV.pca<-rda(annualconcCVforPCA[,seq(from=3,by=2,length.out = 6)], scale=T)
 # PC1 explains 35.95% of the variation, PC2 explains 21.03% of the variation
@@ -907,6 +1311,107 @@ text(-1.85,-0.33,"2000",adj=c(0,0),cex=0.7)
 text(-1.4,-0.33,"2018",adj=c(1,0),cex=0.7)
 
 
+dev.off()
+
+### PC scores over time and vs. potential drivers
+
+## By water year
+png("FIGURES/concCVsPC1vsyear.png",height=2.5,width=5,units='in',res=300)
+par(mar=c(3,3,0.2,4))
+par(mgp=c(1.5,0.4,0))
+par(xpd=TRUE)
+plot(as.vector(scores.concCV$sites[,1])~annualconcCVforPCA$water.year,ylab="Score on PC 1",xlab="water year",type="n",axes=F)
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+# add sites as colors
+for (i in 1:length(unique(annualconcCVforPCA$Site))){
+  points(as.vector(annualconcCVforPCA$water.year[which(annualconcCVforPCA$Site==unique(annualconcCVforPCA$Site)[i])]),as.vector(scores.concCV$sites[which(annualconcCVforPCA$Site==unique(annualconcCVforPCA$Site)[i]),1]),col=site.colors[i],pch=16,type="b")
+}
+legend(2019,-0.5,legend = unique(annualconcCVforPCA$Site),col=site.colors,pch=16,cex=0.8,bty="n")
+dev.off()
+
+
+png("FIGURES/concCVsPC2vsyear.png",height=2.5,width=5,units='in',res=300)
+par(mar=c(3,3,0.2,4))
+par(mgp=c(1.5,0.4,0))
+par(xpd=TRUE)
+plot(as.vector(scores.concCV$sites[,2])~annualconcCVforPCA$water.year,ylab="Score on PC 2",xlab="water year",type="n",axes=F)
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+# add sites as colors
+for (i in 1:length(unique(annualconcCVforPCA$Site))){
+  points(as.vector(annualconcCVforPCA$water.year[which(annualconcCVforPCA$Site==unique(annualconcCVforPCA$Site)[i])]),as.vector(scores.concCV$sites[which(annualconcCVforPCA$Site==unique(annualconcCVforPCA$Site)[i]),2]),col=site.colors[i],pch=16,type="b")
+}
+legend(2019,0,legend = unique(annualconcCVforPCA$Site),col=site.colors,pch=16,cex=0.8,bty="n")
+dev.off()
+
+## Vs. annual precip
+concCV.precip<-left_join(annualconcCVforPCA,BWI.annualprecip,by="water.year")
+concCVPC1.precip.lms<-data.frame(Site=unique(concCV.precip$Site),
+                              pval=rep(NA,times=length(unique(concCV.precip$Site))),
+                              slope=rep(NA,times=length(unique(concCV.precip$Site))),
+                              int=rep(NA,times=length(unique(concCV.precip$Site))),
+                              r2=rep(NA,times=length(unique(concCV.precip$Site))))
+for (i in 1:length(unique(concCV.precip$Site))){
+  concCVPC1.precip.lm<-lm(as.vector(scores.concCV$sites[which(concCV.precip$Site==unique(concCV.precip$Site)[i]),1])~as.vector(concCV.precip$annual.precip[which(concCV.precip$Site==unique(concCV.precip$Site)[i])]))
+  concCVPC1.precip.lms$Site[i]<-unique(concCV.precip$Site)[i]
+  concCVPC1.precip.lms$pval[i]<-lmp(concCVPC1.precip.lm)
+  concCVPC1.precip.lms$slope[i]<-summary(concCVPC1.precip.lm)$coefficients[2]
+  concCVPC1.precip.lms$int[i]<-summary(concCVPC1.precip.lm)$coefficients[1]
+  concCVPC1.precip.lms$r2[i]<-summary(concCVPC1.precip.lm)$adj.r.squared
+}
+png("FIGURES/concCVPC1vsprecip.png",height=3,width=3.5,units='in',res=300)
+par(mar=c(3,3,0.2,0.2))
+par(mgp=c(1.5,0.4,0))
+par(xpd=F)
+plot(as.vector(scores.concCV$sites[,1])~concCV.precip$annual.precip,ylab="Score on PC 1",xlab="annual precip (cm)",type="n",axes=F)
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+# add sites as colors
+for (i in 1:length(unique(concCV.precip$Site))){
+  points(as.vector(concCV.precip$annual.precip[which(concCV.precip$Site==unique(concCV.precip$Site)[i])]),
+         as.vector(scores.concCV$sites[which(concCV.precip$Site==unique(concCV.precip$Site)[i]),1]),
+         col=site.colors[i],pch=16)
+  if(concCVPC1.precip.lms$pval[i]<0.055){
+    abline(concCVPC1.precip.lms$int[i],concCVPC1.precip.lms$slope[i],col=site.colors[i])
+  }
+}
+dev.off()
+
+
+concCVPC2.precip.lms<-data.frame(Site=unique(concCV.precip$Site),
+                                 pval=rep(NA,times=length(unique(concCV.precip$Site))),
+                                 slope=rep(NA,times=length(unique(concCV.precip$Site))),
+                                 int=rep(NA,times=length(unique(concCV.precip$Site))),
+                                 r2=rep(NA,times=length(unique(concCV.precip$Site))))
+for (i in 1:length(unique(concCV.precip$Site))){
+  concCVPC2.precip.lm<-lm(as.vector(scores.concCV$sites[which(concCV.precip$Site==unique(concCV.precip$Site)[i]),2])~as.vector(concCV.precip$annual.precip[which(concCV.precip$Site==unique(concCV.precip$Site)[i])]))
+  concCVPC2.precip.lms$Site[i]<-unique(concCV.precip$Site)[i]
+  concCVPC2.precip.lms$pval[i]<-lmp(concCVPC2.precip.lm)
+  concCVPC2.precip.lms$slope[i]<-summary(concCVPC2.precip.lm)$coefficients[2]
+  concCVPC2.precip.lms$int[i]<-summary(concCVPC2.precip.lm)$coefficients[1]
+  concCVPC2.precip.lms$r2[i]<-summary(concCVPC2.precip.lm)$adj.r.squared
+}
+png("FIGURES/concCVPC2vsprecip.png",height=3,width=3.5,units='in',res=300)
+par(mar=c(3,3,0.2,0.2))
+par(mgp=c(1.5,0.4,0))
+par(xpd=F)
+plot(as.vector(scores.concCV$sites[,2])~concCV.precip$annual.precip,ylab="Score on PC 2",xlab="annual precip (cm)",type="n",axes=F)
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+# add sites as colors
+for (i in 1:length(unique(concCV.precip$Site))){
+  points(as.vector(concCV.precip$annual.precip[which(concCV.precip$Site==unique(concCV.precip$Site)[i])]),
+         as.vector(scores.concCV$sites[which(concCV.precip$Site==unique(concCV.precip$Site)[i]),2]),
+         col=site.colors[i],pch=16)
+  if(concCVPC2.precip.lms$pval[i]<0.055){
+    abline(concCVPC2.precip.lms$int[i],concCVPC2.precip.lms$slope[i],col=site.colors[i])
+  }
+}
 dev.off()
 
 
@@ -973,6 +1478,106 @@ text(-1.55,0.96,"2018",adj=c(1,0),cex=0.7)
 
 dev.off()
 
+### PC scores over time and vs. potential drivers
+
+## By water year
+png("FIGURES/CVratiosPC1vsyear.png",height=2.5,width=5,units='in',res=300)
+par(mar=c(3,3,0.2,4))
+par(mgp=c(1.5,0.4,0))
+par(xpd=TRUE)
+plot(as.vector(scores.CVratio$sites[,1])~annualCVratioforPCA$water.year,ylab="Score on PC 1",xlab="water year",type="n",axes=F)
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+# add sites as colors
+for (i in 1:length(unique(annualCVratioforPCA$Site))){
+  points(as.vector(annualCVratioforPCA$water.year[which(annualCVratioforPCA$Site==unique(annualCVratioforPCA$Site)[i])]),as.vector(scores.CVratio$sites[which(annualCVratioforPCA$Site==unique(annualCVratioforPCA$Site)[i]),1]),col=site.colors[i],pch=16,type="b")
+}
+legend(2019,0,legend = unique(annualCVratioforPCA$Site),col=site.colors,pch=16,cex=0.8,bty="n")
+dev.off()
+
+
+png("FIGURES/CVratiosPC2vsyear.png",height=2.5,width=5,units='in',res=300)
+par(mar=c(3,3,0.2,4))
+par(mgp=c(1.5,0.4,0))
+par(xpd=TRUE)
+plot(as.vector(scores.CVratio$sites[,2])~annualCVratioforPCA$water.year,ylab="Score on PC 2",xlab="water year",type="n",axes=F)
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+# add sites as colors
+for (i in 1:length(unique(annualCVratioforPCA$Site))){
+  points(as.vector(annualCVratioforPCA$water.year[which(annualCVratioforPCA$Site==unique(annualCVratioforPCA$Site)[i])]),as.vector(scores.CVratio$sites[which(annualCVratioforPCA$Site==unique(annualCVratioforPCA$Site)[i]),2]),col=site.colors[i],pch=16,type="b")
+}
+legend(2019,1.5,legend = unique(annualCVratioforPCA$Site),col=site.colors,pch=16,cex=0.8,bty="n")
+dev.off()
+
+## Vs. annual precip
+CVratio.precip<-left_join(annualCVratioforPCA,BWI.annualprecip,by="water.year")
+CVratioPC1.precip.lms<-data.frame(Site=unique(CVratio.precip$Site),
+                                 pval=rep(NA,times=length(unique(CVratio.precip$Site))),
+                                 slope=rep(NA,times=length(unique(CVratio.precip$Site))),
+                                 int=rep(NA,times=length(unique(CVratio.precip$Site))),
+                                 r2=rep(NA,times=length(unique(CVratio.precip$Site))))
+for (i in 1:length(unique(CVratio.precip$Site))){
+  CVratioPC1.precip.lm<-lm(as.vector(scores.CVratio$sites[which(CVratio.precip$Site==unique(CVratio.precip$Site)[i]),1])~as.vector(CVratio.precip$annual.precip[which(CVratio.precip$Site==unique(CVratio.precip$Site)[i])]))
+  CVratioPC1.precip.lms$Site[i]<-unique(CVratio.precip$Site)[i]
+  CVratioPC1.precip.lms$pval[i]<-lmp(CVratioPC1.precip.lm)
+  CVratioPC1.precip.lms$slope[i]<-summary(CVratioPC1.precip.lm)$coefficients[2]
+  CVratioPC1.precip.lms$int[i]<-summary(CVratioPC1.precip.lm)$coefficients[1]
+  CVratioPC1.precip.lms$r2[i]<-summary(CVratioPC1.precip.lm)$adj.r.squared
+}
+png("FIGURES/CVratioPC1vsprecip.png",height=3,width=3.5,units='in',res=300)
+par(mar=c(3,3,0.2,0.2))
+par(mgp=c(1.5,0.4,0))
+par(xpd=F)
+plot(as.vector(scores.CVratio$sites[,1])~CVratio.precip$annual.precip,ylab="Score on PC 1",xlab="annual precip (cm)",type="n",axes=F)
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+# add sites as colors
+for (i in 1:length(unique(CVratio.precip$Site))){
+  points(as.vector(CVratio.precip$annual.precip[which(CVratio.precip$Site==unique(CVratio.precip$Site)[i])]),
+         as.vector(scores.CVratio$sites[which(CVratio.precip$Site==unique(CVratio.precip$Site)[i]),1]),
+         col=site.colors[i],pch=16)
+  if(CVratioPC1.precip.lms$pval[i]<0.055){
+    abline(CVratioPC1.precip.lms$int[i],CVratioPC1.precip.lms$slope[i],col=site.colors[i])
+  }
+}
+dev.off()
+
+
+CVratioPC2.precip.lms<-data.frame(Site=unique(CVratio.precip$Site),
+                                 pval=rep(NA,times=length(unique(CVratio.precip$Site))),
+                                 slope=rep(NA,times=length(unique(CVratio.precip$Site))),
+                                 int=rep(NA,times=length(unique(CVratio.precip$Site))),
+                                 r2=rep(NA,times=length(unique(CVratio.precip$Site))))
+for (i in 1:length(unique(CVratio.precip$Site))){
+  CVratioPC2.precip.lm<-lm(as.vector(scores.CVratio$sites[which(CVratio.precip$Site==unique(CVratio.precip$Site)[i]),2])~as.vector(CVratio.precip$annual.precip[which(CVratio.precip$Site==unique(CVratio.precip$Site)[i])]))
+  CVratioPC2.precip.lms$Site[i]<-unique(CVratio.precip$Site)[i]
+  CVratioPC2.precip.lms$pval[i]<-lmp(CVratioPC2.precip.lm)
+  CVratioPC2.precip.lms$slope[i]<-summary(CVratioPC2.precip.lm)$coefficients[2]
+  CVratioPC2.precip.lms$int[i]<-summary(CVratioPC2.precip.lm)$coefficients[1]
+  CVratioPC2.precip.lms$r2[i]<-summary(CVratioPC2.precip.lm)$adj.r.squared
+}
+png("FIGURES/CVratioPC2vsprecip.png",height=3,width=3.5,units='in',res=300)
+par(mar=c(3,3,0.2,0.2))
+par(mgp=c(1.5,0.4,0))
+par(xpd=F)
+plot(as.vector(scores.CVratio$sites[,2])~CVratio.precip$annual.precip,ylab="Score on PC 2",xlab="annual precip (cm)",type="n",axes=F)
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+# add sites as colors
+for (i in 1:length(unique(CVratio.precip$Site))){
+  points(as.vector(CVratio.precip$annual.precip[which(CVratio.precip$Site==unique(CVratio.precip$Site)[i])]),
+         as.vector(scores.CVratio$sites[which(CVratio.precip$Site==unique(CVratio.precip$Site)[i]),2]),
+         col=site.colors[i],pch=16)
+  if(CVratioPC2.precip.lms$pval[i]<0.055){
+    abline(CVratioPC2.precip.lms$int[i],CVratioPC2.precip.lms$slope[i],col=site.colors[i])
+  }
+}
+dev.off()
 
 
 
