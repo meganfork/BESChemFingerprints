@@ -1,0 +1,48 @@
+---
+title: "BESPharma_WY2018"
+author: "M. Fork"
+date created: "1/21/2020"
+output: html_document
+---
+
+This markdown file contains code to analyze pharmaceutical samples from BES streams collected weekly from 2 Nov 2017 through 15 Nov 2018.
+
+```{r Load libraries}
+
+library(tidyverse)
+library(viridis)
+library(dataRetrieval)
+library(lubridate)
+
+```
+
+```{r Load data}
+
+drugdata<-read.csv("BaltimoreStreamDrugs.csv")
+
+```
+
+```{r Download flow data}
+
+USGS.site.nos<-data.frame(matrix(c(
+  "POBR","01583570",
+  "BARN","01583580",
+  "GFGB","01589197",
+  "GFVN","01589300",
+  "GFCP","01589352",
+  "DRKR","01589330",
+  "GFGL","01589180"),ncol=2,byrow=T))
+colnames(USGS.site.nos)<-c("siteName","siteNumber")
+Q.start<-"2017-11-01"
+Q.end<-"2018-11-16"
+
+
+BESflow<-readNWISdv(siteNumbers = USGS.site.nos$siteNumber,parameterCd = '00060',startDate = Q.start,endDate = Q.end)
+colnames(BESflow)<-c("agency_cd","site_no","Date","meanDailyQ_cfs","qual_cd")
+BESflow$Date<-ymd(BESflow$Date)
+
+BESflow$meanDailyQ_Ls<-BESflow$meanDailyQ_cfs*28.3168
+
+
+```
+
