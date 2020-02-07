@@ -13,12 +13,35 @@ library(tidyverse)
 library(viridis)
 library(dataRetrieval)
 library(lubridate)
+library(naniar)
+library(wesanderson)
 
 ```
 
-```{r Load data}
+```{r Load data and manipulate data frame into tidydata format}
 
-drugdata<-read.csv("BaltimoreStreamDrugs.csv")
+drugdata<-read.csv("BaltimoreStreamDrugs.csv",header=F,stringsAsFactors = F)
+
+drug.names<-drugdata[7:98,1]
+drug.names[70]<-"Acetaminophen"
+drug.sampledates<-drugdata[1,3:373]
+drug.sites<-drugdata[3,3:373]
+drug.data<-as.data.frame(t(drugdata[7:98,3:373]))
+
+indx <- sapply(drug.data, is.factor)
+drug.data[indx] <- lapply(drug.data[indx], function(x) as.numeric(as.character(x)))
+
+tidy.drugdata<-cbind(data.frame(date=as.character(drug.sampledates),site=as.character(drug.sites)),drug.data,make.row.names=F)
+colnames(tidy.drugdata)<-c("date","site",as.character(drug.names))
+tidy.drugdata<-tidy.drugdata[,1:94]
+tidy.drugdata$date<-ymd(tidy.drugdata$date)
+tidy.drugdata$site<-as.character(tidy.drugdata$site)
+
+
+DrugInfo<-read.csv("DrugInfo.csv",header=T,stringsAsFactors = F)
+drug.col<-data.frame(Class=cbind(unique(DrugInfo$Class)),color=viridis(27))
+DrugInfo<-left_join(DrugInfo,drug.col,by="Class")
+DrugInfo$Name[70]<-"Acetaminophen"
 
 ```
 
@@ -37,11 +60,221 @@ Q.start<-"2017-11-01"
 Q.end<-"2018-11-16"
 
 
-BESflow<-readNWISdv(siteNumbers = USGS.site.nos$siteNumber,parameterCd = '00060',startDate = Q.start,endDate = Q.end)
-colnames(BESflow)<-c("agency_cd","site_no","Date","meanDailyQ_cfs","qual_cd")
-BESflow$Date<-ymd(BESflow$Date)
+BESdailyflow<-readNWISdv(siteNumbers = USGS.site.nos$siteNumber,parameterCd = '00060',startDate = Q.start,endDate = Q.end)
+colnames(BESdailyflow)<-c("agency_cd","site_no","Date","Q_cfs","qual_cd")
+BESdailyflow$Date<-ymd(BESdailyflow$Date)
+BESdailyflow$Q_Ls<-BESdailyflow$Q_cfs*28.3168
 
-BESflow$meanDailyQ_Ls<-BESflow$meanDailyQ_cfs*28.3168
+BESinstaflow<-readNWISuv(siteNumbers = USGS.site.nos$siteNumber,parameterCd = '00060',startDate = Q.start,endDate = Q.end)
+colnames(BESinstaflow)<-c("agency_cd","site_no","DateTime","Q_cfs","qual_cd","timezone")
+BESinstaflow$DateTime<-ymd_hms(BESinstaflow$DateTime)
+BESinstaflow$Q_Ls<-BESinstaflow$Q_cfs*28.3168
+BESinstaflow$site_no<-as.character(BESinstaflow$site_no)
+
+
+```
+
+Hypotheses about pharma data to test:
+1) Detections are more frequent in more urbanized sites
+2) When detected, there will be more co-detected pharmaceuticals in more urban sites
+3) When detected, concentrations are higher in more urban sites
+4) Pharma concentration sums are higher in more urban sites 
+
+In addition, calculate loads of pharmaceuticals
+
+```{r Summaries by site}
+
+tidy.drugdata$tot.conc<-rowSums(tidy.drugdata[,3:94],na.rm = T)
+
+tidy.drugdata$detect.count<-apply(as.matrix(tidy.drugdata[,3:94]),1,function(x) sum(x>0,na.rm=T))
+
+#unique sampling dates
+n.samples<-length(unique(tidy.drugdata$date))
+n.sites<-length(unique(tidy.drugdata$site))
+
+drugs.by.site<-tidy.drugdata %>% 
+  group_by(site) %>% 
+  summarise(mean.conc=mean(tot.conc),sd.conc=sd(tot.conc),median.conc=median(tot.conc),tot.detects=sum(detect.count),median.detects=median(detect.count),samples=n())
+
+lulc.data<-read.csv(file="beslulc.csv", header=T)
+
+drugsummary.lulc<-left_join(drugs.by.site,lulc.data,by="site")
+
+png("Figures/BESdrugsdetections.v.ISC.png",height=12,width=12,units='cm',res=300)
+par(mar = c(3.5,3.5,0.5,0.5))
+par(mgp=c(1.3,0.2,0))
+with(subset(drugsummary.lulc,site!="MCDN" & site !="GRGF"),plot(tot.detects~isc,axes=F,pch=16,cex=2,cex.lab=2,xlab="Impervious cover (%)",ylab="Total detections"))
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+dev.off()
+        
+```
+
+
+```{r pharma vs time}
+
+sites.urban<-data.frame(matrix(c('#666666','POBR',
+                                 '#1b9e77','BARN',
+                                 '#66a61e','GFGL',
+                                 '#e7298a','GFGB',
+                                 '#e6ab02','GFVN',
+                                 '#7570b3','GFCP',
+                                 '#d95f02','DRKR'),ncol=2,byrow=T))
+colnames(sites.urban)<-c('color','code')
+
+#fct_relevel(sites.urban$code,c("POBR","BARN","GFGL","GFGB","GFVN","GFCP","DRKR"))
+
+
+with(subset(tidy.drugdata,site=="GFCP"),plot(detect.count~ymd(date),type="b"))
+
+with(subset(tidy.drugdata,site=="GFCP"),plot(tot.conc~ymd(date),type="b"))
+
+
+png("Figures/BESdrugs.totconcanddetects.v.time.png",height=17,width=14,units='cm',res=300)
+par(mfcol=c(2,1))
+par(mar = c(0.5,3,0.5,0.5))
+par(oma = c(2.5,0,0,0))
+par(mgp=c(1.3,0.2,0))
+with(tidy.drugdata,plot(detect.count~ymd(date),type="n",xlab="",ylab="total detections",axes=F,cex.lab=0.9,ylim=c(0,8)))
+axis(1,tck=0.02, cex.axis=0.75,at=ymd(c("2017-11-01","2018-01-01","2018-03-01","2018-05-01","2018-07-01","2018-09-01","2018-11-01")),labels=F) 
+axis(2,tck=0.02, cex.axis=0.75,at=c(0,1,2,3,4,5,6))
+box()
+
+for(i in (1:nrow(sites.urban))){
+  with(subset(tidy.drugdata,site==as.character(sites.urban$code[i])),points(detect.count~ymd(date),type="b",pch=16,col=as.character(sites.urban$color[i])))
+}
+legend('topleft',as.character(sites.urban$code),col=as.character(sites.urban$color),pch=16,cex=0.8)
+
+with(tidy.drugdata,plot(tot.conc~ymd(date),type="n",xlab="",ylab=expression(paste("sum concentration (ng L"^-1,")")),axes=F,cex.lab=0.9,log="y",ylim=c(1,5500)))
+axis(1,tck=0.02, cex.axis=0.75,at=ymd(c("2017-11-01","2018-01-01","2018-03-01","2018-05-01","2018-07-01","2018-09-01","2018-11-01")),labels=c("Nov17","Jan18","Mar18","May18","Jul18","Sep18","Nov18")) 
+axis(2,tck=0.02, cex.axis=0.75,at=c(1,5,50,500,5000),labels=c("0","5","50","500","5000"))
+box()
+
+for(i in (1:nrow(sites.urban))){
+  with(subset(tidy.drugdata,site==as.character(sites.urban$code[i])),points(tot.conc+1~ymd(date),type="b",pch=16,col=as.character(sites.urban$color[i])))
+}
+
+dev.off()
+
+```
+
+
+```{r Load estimates at Carroll Park}
+
+#use chemistry sampling time stamps to estimate time for pharma sampling
+chem.data<-read.csv(file="bes.waterchem.clean.csv", header=T)
+chem.data$Date<-dmy(chem.data$Date)
+chem.data$Site<-as.character(chem.data$Site)
+pharma.sampletimes<-subset(chem.data, Date>=ymd("171102") & Date <=ymd("181115"))[c("Date","time","Site")]
+
+#join the sample times to the drug data and subset for Carroll Park
+pharma.GFCP<-subset(right_join(pharma.sampletimes,tidy.drugdata,by=c("Date"="date","Site"="site")),Site=="GFCP")[-35,]
+pharma.GFCP$time[which(as.character(pharma.GFCP$time)=="2.04")]<-NA
+
+#calculate an "average sampling time" to estimate the dates without recorded sampling time (n=3).
+samp.times<-matrix(unlist(strsplit(as.character(pharma.GFCP$time[which(!is.na(pharma.GFCP$time))]),":")), ncol=2, byrow=TRUE)
+mean(as.numeric(samp.times[,1])*60+as.numeric(samp.times[,2]))/60 #8.484496
+0.484496*60 #29 mins
+#average sampling time is 8:29 am, replace the NAs
+pharma.GFCP$time[which(is.na(pharma.GFCP$time))]<-"8:29"
+
+### using Q measurements within 30 min on either side of sample time, estimate instantaneous flow as the mean in this window (and also record the sd and N_Obs in the window)
+GFCP.datetime<-ymd_hm(paste(pharma.GFCP$Date,pharma.GFCP$time))
+GFCP.instaflow<-subset(BESinstaflow,site_no==USGS.site.nos$siteNumber[which(USGS.site.nos$siteName=="GFCP")]) #subset the Carroll Park data
+GFCP.sample.Q<-list() #For each sample time, extract the Q in the window
+for (i in 1:length(GFCP.datetime)){
+  GFCP.sample.Q[[i]]<-subset(GFCP.instaflow,ymd_hms(DateTime)>=GFCP.datetime[i]-30*60&ymd_hms(DateTime)<=GFCP.datetime[i]+30*60)
+}
+# Calculate mean flow in the window
+GFCP.pharma.Q<-data.frame(Date=pharma.GFCP$Date,time=pharma.GFCP$time,Q.Ls.mean=rep(NA,times=length(pharma.GFCP$time)),Q.Ls.sd=rep(NA,times=length(pharma.GFCP$time)),Q.Ls.n=rep(NA,times=length(pharma.GFCP$time)))
+for (i in 1:nrow(GFCP.pharma.Q)){
+ GFCP.pharma.Q$Q.Ls.mean[i]<-mean(GFCP.sample.Q[[i]]$Q_Ls) 
+ GFCP.pharma.Q$Q.Ls.sd[i]<-sd(GFCP.sample.Q[[i]]$Q_Ls) 
+ GFCP.pharma.Q$Q.Ls.n[i]<-length(GFCP.sample.Q[[i]]$Q_Ls) 
+}
+
+GFCP.load<-full_join(GFCP.pharma.Q,pharma.GFCP,by=c("Date"="Date","time"="time"))
+
+#plot the C-Q relationship for total.conc
+png("Figures/GFCP.totalconc.vs.Q.png",height=12,width=12,units='cm',res=300)
+par(mar = c(3,3,0.8,0.5))
+par(mgp=c(1.3,0.2,0))
+plot(GFCP.load$tot.conc+1~GFCP.load$Q.Ls.mean,log="xy",xlab=expression(paste("Q (Ls"^-1,")")),ylab=expression(paste("sum concentration+1 (ng L"^-1,")")),pch=16,axes=F)
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+dev.off()
+
+
+### Load estimates for GFCP!
+GFCP.sub.names<-colnames(GFCP.load)[colSums(!is.na(GFCP.load)) > 0] #which drugs are detected at GFCP
+GFCP.subset<-GFCP.load[names(GFCP.load) %in% GFCP.sub.names]
+
+#first, calculate and plot timeseries
+CP.color<-left_join(data.frame(Names=GFCP.sub.names[7:22],Class=DrugInfo[DrugInfo$Name %in% GFCP.sub.names,]$Class),data.frame(Class=unique(DrugInfo[DrugInfo$Name %in% GFCP.sub.names,]$Class),color=c("#8dd3c7",
+"#ffffb3",
+"#bebada",
+"#fb8072",
+"#80b1d3",
+"#fdb462",
+"#b3de69",
+"#fccde5",
+"#d9d9d9",
+"#bc80bd")))
+
+
+png("Figures/GFCP.totalload.timeseries.png",height=10,width=15,units='cm',res=300)
+par(mar = c(3,3,0.8,0.5))
+par(mgp=c(1.3,0.2,0))
+plot((GFCP.load$tot.conc*GFCP.load$Q.Ls.mean)*3600/1E+09~ymd(GFCP.load$Date),xlab="",ylab=expression(paste("load (g h"^-1,")")),type="n",axes=F)
+for (i in 1:length(GFCP.sub.names[7:22])){
+points((GFCP.load[,which(colnames(GFCP.load)==GFCP.sub.names[i+6])]*GFCP.load$Q.Ls.mean)*3600/1e+09~ymd(GFCP.load$Date),col=as.character(CP.color$color[which(CP.color$Names==GFCP.sub.names[i+6])]),pch=16)  
+}
+points((GFCP.load$tot.conc*GFCP.load$Q.Ls.mean)*3600/1E+09~ymd(GFCP.load$Date),pch=0,lwd=2)
+axis(1,tck=0.02, cex.axis=0.8,at=ymd(c("2017-11-01","2018-01-01","2018-03-01","2018-05-01","2018-07-01","2018-09-01","2018-11-01")),labels=c("Nov17","Jan18","Mar18","May18","Jul18","Sep18","Nov18")) 
+axis(2,tck=0.02,cex.axis=0.8)
+box()
+legend('topleft',c(as.character(unique(CP.color$Class)),"TOTAL"),col = c(as.character(unique(CP.color$color)),"black"),pch=c(rep(16,times=10),0),pt.lwd = c(rep(0,times=10),2),cex=0.75,bty="n")
+                                                                                                                    
+dev.off()
+
+
+
+#Absolute minimum of annual load at CP: 
+sum((GFCP.load$tot.conc*GFCP.load$Q.Ls.mean)/1E+06) #14.8 mg
+
+#Extrapolating median concentrations: 
+CP.tot.conc.med<-median(GFCP.load$tot.conc)
+CP.tot.load<-with(subset(GFCP.instaflow,DateTime>=ymd_hms("2017-11-02 00:00:00") & DateTime<ymd_hms("2018-11-02 00:00:00")),sum(CP.tot.conc.med*Q_Ls*600)/1e+09) 
+#on average, Q measurements are every 10 mins; we estimate a total of 3.19 kg pharmaceuticals total enter the Bay from this one catchment without a WWTP
+
+CP.aceta<-GFCP.load$Acetaminophen
+CP.aceta[is.na(CP.aceta)]<-0
+mean.aceta.prop<-with(subset(data.frame(aceta=CP.aceta,tot=GFCP.load$tot.conc),tot>0),mean(aceta/tot))
+sd.aceta.prop<-with(subset(data.frame(aceta=CP.aceta,tot=GFCP.load$tot.conc),tot>0),sd(aceta/tot))
+#on average, 36.69% of the total load at Carroll Park is acetaminophen, meaning that the watershed is contributing 1.17 kg of acetominophen annually, the equivalent of 2340 500 mg tablets
+
+CP.antibiotic<-data.frame(cipro=GFCP.load$Ciprofloxacin,oflox=GFCP.load$Ofloxacin,trimeth=GFCP.load$Trimethoprim)
+CP.antibiotic[is.na(CP.antibiotic)]<-0
+mean.antibiotic.prop<-with(subset(data.frame(antibiotic=rowSums(CP.antibiotic),tot=GFCP.load$tot.conc),tot>0),mean(antibiotic/tot)) 
+CP.tot.load*mean.antibiotic.prop
+#on average, 36.85% of the total load at Carroll Park is antibiotics, meaning that the watershed is contributing 1.18 kg of antibiotics annually, the equivalent of 2665 daily doses
+#(1.18*1000*1000)/(((mean.oflox.prop+mean.trimeth.prop)/mean.antibiotic.prop)*400+(mean.cipro.prop/mean.antibiotic.prop)*1000)
+
+CP.antidepressant<-data.frame(amyt=GFCP.load$Amytriptyline,mian=GFCP.load$Mianserin,sertra=GFCP.load$Sertraline,venla=GFCP.load$Venlafaxine)
+CP.antidepressant[is.na(CP.antidepressant)]<-0
+mean.antidepressant.prop<-with(subset(data.frame(antidepressant=rowSums(CP.antidepressant),tot=GFCP.load$tot.conc),tot>0),mean(antidepressant/tot)) 
+CP.tot.load*mean.antidepressant.prop
+#on average, 6.64% of the total load at Carroll Park is antidepressants, meaning that the watershed is contributing  212 g of antidepressants annually
+#(212*1000)/((mean.amyt.prop/mean.antidepressant.prop)*75+(mean.mian.prop/mean.antidepressant.prop)*60+(mean.sertra.prop/mean.antidepressant.prop)*50+(mean.venla.prop/mean.antidepressant.prop)*100)
+
+
+#Other things to try are sampling from the distribution and randomly applying it to the Q timeseries, using a monte carlo approach or something
+
+#What if all BDLs are 0.5*BDL, vs. some are true zeroes, etc.
+
+
 
 
 ```
