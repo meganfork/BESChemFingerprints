@@ -404,7 +404,7 @@ for (i in 1:length(CandQ.bysite)){
     axis(1,tck=0.02,cex.axis=0.85)
     axis(2,tck=0.02,cex.axis=0.85)
     box()
-    text(2,3.4,names(CandQ.bysite)[i],font=2)
+    #text(2,3.4,names(CandQ.bysite)[i],font=2)
     
     for (k in 1:length(BES.water.years)){
     wateryear.sub<-filter(CandQ.bysite[[i]],water.year==BES.water.years[k])
@@ -549,7 +549,14 @@ for (i in 1:length(annualCVC.CVQ.bysite)){
 annualCVratios<-do.call("rbind",annualCVC.CVQ.bysite) #make "by-site" list into one dataframe
 
 
+# plot by site by time
 
+
+#annual C-Q and CVC:CVQ vs. discharge a la 2017 paper
+
+#loads of chloride and sulfate over time?
+
+#comparing with instantaneous Q
 
 
 # Multisolute Analysis Plan:
@@ -571,8 +578,17 @@ site.colors<-c('#1b9e77',
                '#66a61e',
                '#e6ab02',
                '#666666')
-site.symbols<-c(3,16,25,15,24,18,1,4)
 
+site.symbols<-c(3,16,25,15,24,18,1,4)
+site.colors.ordered<-data.frame(color=c('#1b9e77',
+                                        '#d95f02',
+                                        '#7570b3',
+                                        '#e7298a',
+                                        '#66a61e',
+                                        '#e6ab02',
+                                        '#666666'), sites=c("BARN", "DRKR", "GFCP", "GFGB", "GFGL", "GFVN", "POBR")) %>% 
+  arrange(fct_relevel(sites,c("POBR","BARN","GFGL","GFGB","GFVN","GFCP","DRKR"))) %>% 
+  mutate(color=factor(color,color))
 
 
 #### 1. Annual means ####
@@ -766,9 +782,9 @@ text(scores.range$species[,1]*Nudge,scores.range$species[,2]*Nudge,rownames(scor
 # add sites as colors
 
 for (i in 1:length(unique(range.minusMCDN$Site))){
-  points(as.vector(scores.range$sites[which(range.minusMCDN$Site==unique(range.minusMCDN$Site)[i]),1]),as.vector(scores.range$sites[which(range.minusMCDN$Site==unique(range.minusMCDN$Site)[i]),2]),col=site.colors[i])
+  points(as.vector(scores.range$sites[which(range.minusMCDN$Site==unique(range.minusMCDN$Site)[i]),1]),as.vector(scores.range$sites[which(range.minusMCDN$Site==unique(range.minusMCDN$Site)[i]),2]),pch=16,col=site.colors[i])
 }
-legend('bottomleft',legend = unique(range.minusMCDN$Site),col=site.colors,pch=1,pt.lwd=2)
+legend('bottomleft',legend = site.colors.ordered$sites,col=as.character(site.colors.ordered$color),pch=16,pt.lwd=2)
 
 dev.off()
 
@@ -804,12 +820,12 @@ dev.off()
 ### PC scores over time and vs. potential drivers
 
 ## By water year
-png("FIGURES/RangesPC1vsyear.png",height=2.5,width=5,units='in',res=300)
+png("FIGURES/RangesPC1vsyear.png",height=2.5,width=4,units='in',res=300)
 
-par(mar=c(3,3,0.2,4))
+par(mar=c(3,3,0.2,0.2))
 par(mgp=c(1.5,0.4,0))
 par(xpd=TRUE)
-plot(as.vector(scores.range$sites[,1])~range.minusMCDN$water.year,ylab="Score on PC 1",xlab="water year",type="n",axes=F)
+plot(as.vector(scores.range$sites[,1])~range.minusMCDN$water.year,ylab="Score on PC 1",xlab="water year",type="n",axes=F,cex.lab=1.2)
 axis(1,tck=0.02)
 axis(2,tck=0.02)
 box()
@@ -817,7 +833,7 @@ box()
 for (i in 1:length(unique(range.minusMCDN$Site))){
   points(as.vector(range.minusMCDN$water.year[which(range.minusMCDN$Site==unique(range.minusMCDN$Site)[i])]),as.vector(scores.range$sites[which(range.minusMCDN$Site==unique(range.minusMCDN$Site)[i]),1]),col=site.colors[i],pch=16,type="b")
 }
-legend(2019,1,legend = unique(range.minusMCDN$Site),col=site.colors,pch=16,cex=0.8,bty="n")
+#legend(2019,1,legend = unique(range.minusMCDN$Site),col=site.colors,pch=16,cex=0.8,bty="n")
 dev.off()
 
 
@@ -836,11 +852,11 @@ for (i in 1:length(unique(range.minusMCDN$Site))){
   rangePC1.precip.lms$int[i]<-summary(rangePC.precip.lm)$coefficients[1]
   rangePC1.precip.lms$r2[i]<-summary(rangePC.precip.lm)$adj.r.squared
 }
-png("FIGURES/rangePC1vsprecip.png",height=3,width=3.5,units='in',res=300)
+png("FIGURES/rangePC1vsprecip.png",height=2.5,width=3,units='in',res=300)
 par(mar=c(3,3,0.2,0.2))
 par(mgp=c(1.5,0.4,0))
 par(xpd=F)
-plot(as.vector(scores.range$sites[,1])~range.precip$annual.precip,ylab="Score on PC 1",xlab="annual precip (cm)",type="n",axes=F)
+plot(as.vector(scores.range$sites[,1])~range.precip$annual.precip,ylab="Score on PC 1",xlab="annual precip (cm)",type="n",axes=F,cex.lab=1.2)
 axis(1,tck=0.02)
 axis(2,tck=0.02)
 box()
