@@ -15,6 +15,8 @@ library(dataRetrieval)
 library(lubridate)
 library(naniar)
 library(wesanderson)
+library(zoo)
+library(doParallel)
 
 ```
 
@@ -239,15 +241,26 @@ legend('topleft',c(as.character(unique(CP.color$Class)),"TOTAL"),col = c(as.char
                                                                                                                     
 dev.off()
 
+#######################
+### Q interpolation ###
+#######################
 
+CP.Q<-subset(GFCP.instaflow,DateTime>=ymd_hms("2017-11-02 00:00:00") & DateTime<ymd_hms("2018-11-02 00:00:00"))
+fiveminseq<-data.frame(DateTime=seq(from=ymd_hms("2017-11-02 00:00:00"), to = ymd_hms("2018-11-01 23:55:00"),by='5 min')) # create a full time series for the year of discharge
+CP.Q.seq<-left_join(fiveminseq,CP.Q) # join the USGS Q to the full timeseries
+CP.Q.seq$Q_Ls<-na.approx(CP.Q.seq$Q_Ls,na.rm = F) # linearly interpolate missing Q values
+
+#######################
+### Median approach ###
+#######################
 
 #Absolute minimum of annual load at CP: 
 sum((GFCP.load$tot.conc*GFCP.load$Q.Ls.mean)/1E+06) #14.8 mg
 
 #Extrapolating median concentrations: 
 CP.tot.conc.med<-median(GFCP.load$tot.conc)
-CP.tot.load<-with(subset(GFCP.instaflow,DateTime>=ymd_hms("2017-11-02 00:00:00") & DateTime<ymd_hms("2018-11-02 00:00:00")),sum(CP.tot.conc.med*Q_Ls*600)/1e+09) 
-#on average, Q measurements are every 10 mins; we estimate a total of 3.19 kg pharmaceuticals total enter the Bay from this one catchment without a WWTP
+CP.tot.load<-sum(CP.Q.seq$Q_Ls*CP.tot.conc.med*300)/1e+09 
+#Q measurements are every 5 mins; we estimate a total of 1.61 kg pharmaceuticals total enter the Bay from this one catchment without a WWTP
 
 CP.aceta<-GFCP.load$Acetaminophen
 CP.aceta[is.na(CP.aceta)]<-0
@@ -269,12 +282,71 @@ CP.tot.load*mean.antidepressant.prop
 #on average, 6.64% of the total load at Carroll Park is antidepressants, meaning that the watershed is contributing  212 g of antidepressants annually
 #(212*1000)/((mean.amyt.prop/mean.antidepressant.prop)*75+(mean.mian.prop/mean.antidepressant.prop)*60+(mean.sertra.prop/mean.antidepressant.prop)*50+(mean.venla.prop/mean.antidepressant.prop)*100)
 
+#############################
+### Resampling approaches ###
+#############################
 
-#Other things to try are sampling from the distribution and randomly applying it to the Q timeseries, using a monte carlo approach or something
+## create three versions of the GFCP drug data: all NAs filled with zeros, all NAs filled with 0.5 detection limit, and a 50-50 mix of the two:
+CP.tidydrugs<-subset(tidy.drugdata,site=="GFCP")
+CP.zeros<-CP.tidydrugs
+CP.zeros[is.na(CP.zeros)] = 0
+CP.zeros$tot.conc<-rowSums(CP.zeros[,3:94],na.rm = T)
 
-#What if all BDLs are 0.5*BDL, vs. some are true zeroes, etc.
+CP.halfdetect<-CP.tidydrugs
+for (i in 3:ncol(CP.halfdetect)){
+  CP.halfdetect[,i]<-replace_na(CP.halfdetect[,i], DrugInfo[i-2,'LOQ']/2)
+}
+CP.halfdetect$tot.conc<-rowSums(CP.halfdetect[,3:94],na.rm = T)
+
+CP.mixed<-CP.tidydrugs
+for (i in 3:ncol(CP.mixed)){
+  CP.mixed[base::sample(which(is.na(CP.mixed[,i])),size=0.5*length(which(is.na(CP.mixed[,i])))),i]<-0
+    
+  CP.mixed[,i]<-replace_na(CP.mixed[,i], DrugInfo[i-2,'LOQ']/2)
+}
+CP.mixed$tot.conc<-rowSums(CP.mixed[,3:94],na.rm = T)
 
 
+# re-sample from each of these types for each drug and apply them to the discharge time-series
+
+#Set up the function "estimate load", which takes the inputs "site.type.drug" (a vector) specifying which site, the type of estimation for BDL data, and which drug (e.g. "CP.zeros$tot.conc") and the site-specific, gap-filled Q timeseries (a vector, e.g. "CP.Q.seq")
+estimate.load<- function(site.type.drug,Q.seq){ 
+  sample<-base::sample(site.type.drug,size = nrow(Q.seq),replace = T) # this part randomly samples from the concentrations, with replacement, and applies them to the discharge timeseries
+  tot.load<-sum(sample*Q.seq$Q_Ls*300)/1e+09 # this part multiplies concentration by discharge and sums over the discharge time series to give a total load in grams
+  return(tot.load)
+}
+
+### NOW, apply a bootstrap, and repeat it for each drug and each type of estimation
+
+runs<-10000
+
+cl <- makeCluster(3)
+registerDoParallel(cl)  # initiate the cluster to run in parallel
+
+#CP.zeros.MC<-list()
+#for (i in 3:ncol(CP.zeros)){
+#  CP.zeros.MC[[i-2]]<-replicate(runs,estimate.load(CP.zeros[,i],CP.Q.seq))
+#}
+#names(CP.zeros.MC)<-colnames(CP.zeros)[3:ncol(CP.zeros)]
+
+CP.zeros.MC <- foreach(i=3:ncol(CP.zeros), .combine = "cbind.data.frame") %dopar% { 
+  replicate(runs,estimate.load(CP.zeros[,i],CP.Q.seq))
+}
+names(CP.zeros.MC)<-colnames(CP.zeros)[3:ncol(CP.zeros)]
+
+# mean(CP.zeros.MC$Acetaminophen)*2   is the equivalent of acetaminophen tablets discharged (28814)
+
+# mean(CP.zeros.MC$Ofloxacin)*(1000/400)+mean(CP.zeros.MC$Trimethoprim)*(1000/400)+mean(CP.zeros.MC$Ciprofloxacin)    is the equivalent of total antibiotics discharged (914)
+
+# mean(CP.zeros.MC$Amytriptyline)*(1000/75)+mean(CP.zeros.MC$Mianserin)*(1000/60)+mean(CP.zeros.MC$Sertraline)*(1000/50)+mean(CP.zeros.MC$Venlafaxine)*(1000/100)    is the equivalent of total antibiotics discharged (9301)
+
+
+CP.halfdetect.MC <- foreach(i=3:ncol(CP.halfdetect), .combine = "cbind.data.frame") %dopar% { 
+  replicate(runs,estimate.load(CP.halfdetect[,i],CP.Q.seq))
+}
+names(CP.halfdetect.MC)<-colnames(CP.halfdetect)[3:ncol(CP.halfdetect)]
+
+#stopCluster(cl)
 
 
 ```
