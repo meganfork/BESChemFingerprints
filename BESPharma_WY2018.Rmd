@@ -4,9 +4,31 @@ author: "M. Fork"
 date created: "1/21/2020"
 output: html_document
 ---
+Last edited: 7April2020 by MLF
 
-This markdown file contains code to analyze pharmaceutical samples from BES streams collected weekly from 2 Nov 2017 through 15 Nov 2018.
 
+This markdown file contains code to analyze pharmaceutical samples from BES streams collected weekly from 2 Nov 2017 through 15 Nov 2018. For each of 7 BES watersheds, I use these samples and USGS streamflow data to estimate annual loads of pharmaceuticals by bootstrapping or by interpolating concentrations over the discharge record. These measurements and estimates are then compared to influent and effluent measurements from WWTPs. Code chunks are:
+
+1. Load libraries
+2. Load pharmaceutical data and manipulate data frame into tidydata format
+3. Load previously saved flow data or download flow data from USGS
+4. Summaries of data by site
+5. Plot detections/concentrations over time
+
+
+
+
+Hypotheses about pharma data to test:
+1) Detections are more frequent in more urbanized sites
+2) When detected, there will be more co-detected pharmaceuticals in more urban sites
+3) When detected, concentrations are higher in more urban sites
+4) Pharma concentration sums are higher in more urban sites 
+
+In addition, calculate loads of pharmaceuticals and compare to WWTP influent/effluent
+
+
+
+1. Load libraries
 ```{r Load libraries}
 
 library(tidyverse)
@@ -17,10 +39,13 @@ library(naniar)
 library(wesanderson)
 library(zoo)
 library(doParallel)
+library(Rmisc)
 
 ```
 
-```{r Load data and manipulate data frame into tidydata format}
+
+2. Load pharmaceutical data and manipulate data frame into tidydata format
+```{r Load pharma data and manipulate data frame into tidydata format}
 
 drugdata<-read.csv("BaltimoreStreamDrugs.csv",header=F,stringsAsFactors = F)
 
@@ -45,9 +70,76 @@ drug.col<-data.frame(Class=cbind(unique(DrugInfo$Class)),color=viridis(27))
 DrugInfo<-left_join(DrugInfo,drug.col,by="Class")
 DrugInfo$Name[70]<-"Acetaminophen"
 
+# load census block population estimates
+pops<-read.csv("BESwatershedPops_cblocks.csv",header = T,stringsAsFactors = F)
+
+# load pharma loads in effluent digitized from Verlicchi et al. 2012
+VerlicchiLoads<-read.csv("VerlicchiEffluentLoads.csv",header = T)
+
+
+### If USING, not calculating, fluxes and loads, load the results of load calculations below:
+# Bootstrap results:
+GFCP.zeros.boot<-read.csv('GFCP.bootstrappedfluxes.zeros.csv',header = T)
+GFCP.halfdetect.boot<-read.csv('GFCP.bootstrappedfluxes.halfdetect.csv',header = T)
+GFCP.mixed.boot<-read.csv('GFCP.bootstrappedfluxes.mixed.csv',header = T)
+
+GFVN.zeros.boot<-read.csv('GFVN.bootstrappedfluxes.zeros.csv',header = T)
+GFVN.halfdetect.boot<-read.csv('GFVN.bootstrappedfluxes.halfdetect.csv',header = T)
+GFVN.mixed.boot<-read.csv('GFVN.bootstrappedfluxes.mixed.csv',header = T)
+
+GFGB.zeros.boot<-read.csv('GFGB.bootstrappedfluxes.zeros.csv',header = T)
+GFGB.halfdetect.boot<-read.csv('GFGB.bootstrappedfluxes.halfdetect.csv',header = T)
+GFGB.mixed.boot<-read.csv('GFGB.bootstrappedfluxes.mixed.csv',header = T)
+
+GFGL.zeros.boot<-read.csv('GFGL.bootstrappedfluxes.zeros.csv',header = T)
+GFGL.halfdetect.boot<-read.csv('GFGL.bootstrappedfluxes.halfdetect.csv',header = T)
+GFGL.mixed.boot<-read.csv('GFGL.bootstrappedfluxes.mixed.csv',header = T)
+
+POBR.zeros.boot<-read.csv('POBR.bootstrappedfluxes.zeros.csv',header = T)
+POBR.halfdetect.boot<-read.csv('POBR.bootstrappedfluxes.halfdetect.csv',header = T)
+POBR.mixed.boot<-read.csv('POBR.bootstrappedfluxes.mixed.csv',header = T)
+
+BARN.zeros.boot<-read.csv('BARN.bootstrappedfluxes.zeros.csv',header = T)
+BARN.halfdetect.boot<-read.csv('BARN.bootstrappedfluxes.halfdetect.csv',header = T)
+BARN.mixed.boot<-read.csv('BARN.bootstrappedfluxes.mixed.csv',header = T)
+
+DRKR.zeros.boot<-read.csv('DRKR.bootstrappedfluxes.zeros.csv',header = T)
+DRKR.halfdetect.boot<-read.csv('DRKR.bootstrappedfluxes.halfdetect.csv',header = T)
+DRKR.mixed.boot<-read.csv('DRKR.bootstrappedfluxes.mixed.csv',header = T)
+
+#Interpolation results:
+GFCP.mixed.interp<-read.csv('GFCP.mixed_interpolation.BootstrapResults.csv',header = T)
+GFCP.interp<-read.csv('GFCP.interp.csv',header=T)
+
+GFVN.mixed.interp<-read.csv('GFVN.mixed_interpolation.BootstrapResults.csv',header = T)
+GFVN.interp<-read.csv('GFVN.interp.csv',header=T)
+
+GFGB.mixed.interp<-read.csv('GFGB.mixed_interpolation.BootstrapResults.csv',header = T)
+GFGB.interp<-read.csv('GFGB.interp.csv',header=T)
+
+GFGL.mixed.interp<-read.csv('GFGL.mixed_interpolation.BootstrapResults.csv',header = T)
+GFGL.interp<-read.csv('GFGL.interp.csv',header=T)
+
+POBR.mixed.interp<-read.csv('POBR.mixed_interpolation.BootstrapResults.csv',header = T)
+POBR.interp<-read.csv('POBR.interp.csv',header=T)
+
+BARN.mixed.interp<-read.csv('BARN.mixed_interpolation.BootstrapResults.csv',header = T)
+BARN.interp<-read.csv('BARN.interp.csv',header=T)
+
+DRKR.mixed.interp<-read.csv('DRKR.mixed_interpolation.BootstrapResults.csv',header = T)
+DRKR.interp<-read.csv('DRKR.interp.csv',header=T)
+
 ```
 
+
+3. Load previously saved flow data or download flow data from USGS
 ```{r Download flow data}
+
+#read in preciously saved flow
+# BESdailyflow<-read.csv('BES.dailyQ.csv',header=T)
+# BESdailyflow$Date<-ymd(BESdailyflow$Date)
+# BESinstaflow<-read.csv('BES.instantaneousQ.csv',header=T)
+# BESinstaflow$DateTime<-ymd_hms(BESinstaflow$DateTime)
 
 USGS.site.nos<-data.frame(matrix(c(
   "POBR","01583570",
@@ -66,24 +158,29 @@ BESdailyflow<-readNWISdv(siteNumbers = USGS.site.nos$siteNumber,parameterCd = '0
 colnames(BESdailyflow)<-c("agency_cd","site_no","Date","Q_cfs","qual_cd")
 BESdailyflow$Date<-ymd(BESdailyflow$Date)
 BESdailyflow$Q_Ls<-BESdailyflow$Q_cfs*28.3168
+# write.csv(BESdailyflow,'BES.dailyQ.csv',row.names = F)
 
 BESinstaflow<-readNWISuv(siteNumbers = USGS.site.nos$siteNumber,parameterCd = '00060',startDate = Q.start,endDate = Q.end)
 colnames(BESinstaflow)<-c("agency_cd","site_no","DateTime","Q_cfs","qual_cd","timezone")
 BESinstaflow$DateTime<-ymd_hms(BESinstaflow$DateTime)
 BESinstaflow$Q_Ls<-BESinstaflow$Q_cfs*28.3168
 BESinstaflow$site_no<-as.character(BESinstaflow$site_no)
+# write.csv(BESinstaflow,'BES.instantaneousQ.csv',row.names = F)
+
+#subset flow data for each site
+GFCP.instaflow<-subset(BESinstaflow,site_no==as.character(USGS.site.nos$siteNumber[which(USGS.site.nos$siteName=="GFCP")])) #GFCP flow
+GFVN.instaflow<-subset(BESinstaflow,site_no==as.character(USGS.site.nos$siteNumber[which(USGS.site.nos$siteName=="GFVN")])) #GFVN flow
+GFGB.instaflow<-subset(BESinstaflow,site_no==as.character(USGS.site.nos$siteNumber[which(USGS.site.nos$siteName=="GFGB")])) #GFGB flow
+GFGL.instaflow<-subset(BESinstaflow,site_no==as.character(USGS.site.nos$siteNumber[which(USGS.site.nos$siteName=="GFGL")])) #GFGL flow
+POBR.instaflow<-subset(BESinstaflow,site_no==as.character(USGS.site.nos$siteNumber[which(USGS.site.nos$siteName=="POBR")])) #POBR flow
+BARN.instaflow<-subset(BESinstaflow,site_no==as.character(USGS.site.nos$siteNumber[which(USGS.site.nos$siteName=="BARN")])) #BARN flow
+DRKR.instaflow<-subset(BESinstaflow,site_no==as.character(USGS.site.nos$siteNumber[which(USGS.site.nos$siteName=="DRKR")])) #DRKR flow
 
 
 ```
 
-Hypotheses about pharma data to test:
-1) Detections are more frequent in more urbanized sites
-2) When detected, there will be more co-detected pharmaceuticals in more urban sites
-3) When detected, concentrations are higher in more urban sites
-4) Pharma concentration sums are higher in more urban sites 
 
-In addition, calculate loads of pharmaceuticals
-
+4. Summaries of data by site
 ```{r Summaries by site}
 
 tidy.drugdata$tot.conc<-rowSums(tidy.drugdata[,3:94],na.rm = T)
@@ -114,6 +211,7 @@ dev.off()
 ```
 
 
+5. Plot detections/concentrations over time
 ```{r pharma vs time}
 
 sites.urban<-data.frame(matrix(c('#666666','POBR',
@@ -162,6 +260,7 @@ dev.off()
 ```
 
 
+6. C-Q and load estimates at Carroll Park
 ```{r Load estimates at Carroll Park}
 
 #use chemistry sampling time stamps to estimate time for pharma sampling
@@ -183,7 +282,6 @@ pharma.GFCP$time[which(is.na(pharma.GFCP$time))]<-"8:29"
 
 ### using Q measurements within 30 min on either side of sample time, estimate instantaneous flow as the mean in this window (and also record the sd and N_Obs in the window)
 GFCP.datetime<-ymd_hm(paste(pharma.GFCP$Date,pharma.GFCP$time))
-GFCP.instaflow<-subset(BESinstaflow,site_no==USGS.site.nos$siteNumber[which(USGS.site.nos$siteName=="GFCP")]) #subset the Carroll Park data
 GFCP.sample.Q<-list() #For each sample time, extract the Q in the window
 for (i in 1:length(GFCP.datetime)){
   GFCP.sample.Q[[i]]<-subset(GFCP.instaflow,ymd_hms(DateTime)>=GFCP.datetime[i]-30*60&ymd_hms(DateTime)<=GFCP.datetime[i]+30*60)
@@ -254,13 +352,12 @@ CP.Q.seq$Q_Ls<-na.approx(CP.Q.seq$Q_Ls,na.rm = F) # linearly interpolate missing
 ### Median approach ###
 #######################
 
-#Absolute minimum of annual load at CP: 
-sum((GFCP.load$tot.conc*GFCP.load$Q.Ls.mean)/1E+06) #14.8 mg
-
 #Extrapolating median concentrations: 
 CP.tot.conc.med<-median(GFCP.load$tot.conc)
-CP.tot.load<-sum(CP.Q.seq$Q_Ls*CP.tot.conc.med*300)/1e+09 
-#Q measurements are every 5 mins; we estimate a total of 1.61 kg pharmaceuticals total enter the Bay from this one catchment without a WWTP
+CP.tot.conc.mean<-mean(GFCP.load$tot.conc)
+CP.tot.load.med<-sum(CP.Q.seq$Q_Ls*CP.tot.conc.med*300)/1e+09
+CP.tot.load.mean<-sum(CP.Q.seq$Q_Ls*CP.tot.conc.mean*300)/1e+09
+#Q measurements are every 5 mins; we estimate a total of 1.61 kg (median) to 16.61 kg (mean) pharmaceuticals total enter the Bay from this one catchment without a WWTP
 
 CP.aceta<-GFCP.load$Acetaminophen
 CP.aceta[is.na(CP.aceta)]<-0
@@ -271,20 +368,22 @@ sd.aceta.prop<-with(subset(data.frame(aceta=CP.aceta,tot=GFCP.load$tot.conc),tot
 CP.antibiotic<-data.frame(cipro=GFCP.load$Ciprofloxacin,oflox=GFCP.load$Ofloxacin,trimeth=GFCP.load$Trimethoprim)
 CP.antibiotic[is.na(CP.antibiotic)]<-0
 mean.antibiotic.prop<-with(subset(data.frame(antibiotic=rowSums(CP.antibiotic),tot=GFCP.load$tot.conc),tot>0),mean(antibiotic/tot)) 
-CP.tot.load*mean.antibiotic.prop
-#on average, 36.85% of the total load at Carroll Park is antibiotics, meaning that the watershed is contributing 1.18 kg of antibiotics annually, the equivalent of 2665 daily doses
+CP.tot.load.med*mean.antibiotic.prop
+CP.tot.load.mean*mean.antibiotic.prop
+#on average, 36.85% of the total load at Carroll Park is antibiotics, meaning that the watershed is contributing 592.9 g (median) to 6.12 kg (mean) of antibiotics annually, the equivalent of 2665 daily doses
 #(1.18*1000*1000)/(((mean.oflox.prop+mean.trimeth.prop)/mean.antibiotic.prop)*400+(mean.cipro.prop/mean.antibiotic.prop)*1000)
 
 CP.antidepressant<-data.frame(amyt=GFCP.load$Amytriptyline,mian=GFCP.load$Mianserin,sertra=GFCP.load$Sertraline,venla=GFCP.load$Venlafaxine)
 CP.antidepressant[is.na(CP.antidepressant)]<-0
 mean.antidepressant.prop<-with(subset(data.frame(antidepressant=rowSums(CP.antidepressant),tot=GFCP.load$tot.conc),tot>0),mean(antidepressant/tot)) 
-CP.tot.load*mean.antidepressant.prop
-#on average, 6.64% of the total load at Carroll Park is antidepressants, meaning that the watershed is contributing  212 g of antidepressants annually
+CP.tot.load.med*mean.antidepressant.prop
+CP.tot.load.mean*mean.antidepressant.prop
+#on average, 6.64% of the total load at Carroll Park is antidepressants, meaning that the watershed is contributing  106.8 g (median) to 1.10 kg (mean) of antidepressants annually
 #(212*1000)/((mean.amyt.prop/mean.antidepressant.prop)*75+(mean.mian.prop/mean.antidepressant.prop)*60+(mean.sertra.prop/mean.antidepressant.prop)*50+(mean.venla.prop/mean.antidepressant.prop)*100)
 
-#############################
-### Resampling approaches ###
-#############################
+#####################################
+### SET UP DIFFERENT "APPROACHES" ###
+#####################################
 
 ## create three versions of the GFCP drug data: all NAs filled with zeros, all NAs filled with 0.5 detection limit, and a 50-50 mix of the two:
 CP.tidydrugs<-subset(tidy.drugdata,site=="GFCP")
@@ -306,6 +405,10 @@ for (i in 3:ncol(CP.mixed)){
 }
 CP.mixed$tot.conc<-rowSums(CP.mixed[,3:94],na.rm = T)
 
+
+#############################
+### Resampling approaches ###
+#############################
 
 # re-sample from each of these types for each drug and apply them to the discharge time-series
 
@@ -333,20 +436,2134 @@ CP.zeros.MC <- foreach(i=3:ncol(CP.zeros), .combine = "cbind.data.frame") %dopar
   replicate(runs,estimate.load(CP.zeros[,i],CP.Q.seq))
 }
 names(CP.zeros.MC)<-colnames(CP.zeros)[3:ncol(CP.zeros)]
+# write.csv(CP.zeros.MC,'GFCP.bootstrappedfluxes.zeros.csv',row.names = F)
 
 # mean(CP.zeros.MC$Acetaminophen)*2   is the equivalent of acetaminophen tablets discharged (28814)
+# CI(CP.zeros.MC$Acetaminophen, ci=0.95) = [14.39, 14.43], mean = 14.41 kg
 
 # mean(CP.zeros.MC$Ofloxacin)*(1000/400)+mean(CP.zeros.MC$Trimethoprim)*(1000/400)+mean(CP.zeros.MC$Ciprofloxacin)    is the equivalent of total antibiotics discharged (914)
+# CI((CP.zeros.MC$Ofloxacin+CP.zeros.MC$Trimethoprim+CP.zeros.MC$Ciprofloxacin),ci=0.95) = [386.1,386.4], mean = 386.3 g
 
-# mean(CP.zeros.MC$Amytriptyline)*(1000/75)+mean(CP.zeros.MC$Mianserin)*(1000/60)+mean(CP.zeros.MC$Sertraline)*(1000/50)+mean(CP.zeros.MC$Venlafaxine)*(1000/100)    is the equivalent of total antibiotics discharged (9301)
-
+# mean(CP.zeros.MC$Amytriptyline)*(1000/75)+mean(CP.zeros.MC$Mianserin)*(1000/60)+mean(CP.zeros.MC$Sertraline)*(1000/50)+mean(CP.zeros.MC$Venlafaxine)*(1000/100)    is the equivalent of total antidepressants discharged (9301)
+# CI((CP.zeros.MC$Amytriptyline+CP.zeros.MC$Mianserin+CP.zeros.MC$Sertraline+CP.zeros.MC$Venlafaxine),ci=0.95) = [671.4,672.7], mean = 672.1 g
 
 CP.halfdetect.MC <- foreach(i=3:ncol(CP.halfdetect), .combine = "cbind.data.frame") %dopar% { 
   replicate(runs,estimate.load(CP.halfdetect[,i],CP.Q.seq))
 }
 names(CP.halfdetect.MC)<-colnames(CP.halfdetect)[3:ncol(CP.halfdetect)]
+# write.csv(CP.halfdetect.MC,'GFCP.bootstrappedfluxes.halfdetect.csv',row.names = F)
+
+# mean(CP.halfdetect.MC$Acetaminophen)*2   is the equivalent of acetaminophen tablets discharged (31835)
+# CI(CP.halfdetect.MC$Acetaminophen, ci=0.95) = [15.90, 15.94], mean = 15.92 kg
+
+# mean(CP.halfdetect.MC$Ofloxacin)*(1000/400)+mean(CP.halfdetect.MC$Trimethoprim)*(1000/400)+mean(CP.halfdetect.MC$Ciprofloxacin)    is the equivalent of total antibiotics discharged (2448)
+# CI((CP.halfdetect.MC$Ofloxacin+CP.halfdetect.MC$Trimethoprim+CP.halfdetect.MC$Ciprofloxacin),ci=0.95) = [1.429,1.430], mean = 1.43 kg
+
+# mean(CP.halfdetect.MC$Amytriptyline)*(1000/75)+mean(CP.halfdetect.MC$Mianserin)*(1000/60)+mean(CP.halfdetect.MC$Sertraline)*(1000/50)+mean(CP.halfdetect.MC$Venlafaxine)*(1000/100)    is the equivalent of total antidepressants discharged (50855)
+# CI((CP.halfdetect.MC$Amytriptyline+CP.halfdetect.MC$Mianserin+CP.halfdetect.MC$Sertraline+CP.halfdetect.MC$Venlafaxine),ci=0.95) = [3.738,3.740], mean = 3.74 kg
+
+
+
+CP.mixed.MC <- foreach(i=3:ncol(CP.mixed), .combine = "cbind.data.frame") %dopar% { 
+  replicate(runs,estimate.load(CP.mixed[,i],CP.Q.seq))
+}
+names(CP.mixed.MC)<-colnames(CP.mixed)[3:ncol(CP.mixed)]
+# write.csv(CP.mixed.MC,'GFCP.bootstrappedfluxes.mixed.csv',row.names = F)
+
+# mean(CP.mixed.MC$Acetaminophen)*2   is the equivalent of acetaminophen tablets discharged (30313)
+# CI(CP.mixed.MC$Acetaminophen, ci=0.95) = [15.14, 15.17], mean = 15.16 kg
+
+# mean(CP.mixed.MC$Ofloxacin)*(1000/400)+mean(CP.mixed.MC$Trimethoprim)*(1000/400)+mean(CP.mixed.MC$Ciprofloxacin)    is the equivalent of total antibiotics discharged (1692)
+# CI((CP.mixed.MC$Ofloxacin+CP.mixed.MC$Trimethoprim+CP.mixed.MC$Ciprofloxacin),ci=0.95) = [912.2,912.5], mean = 912.4 g
+
+# mean(CP.mixed.MC$Amytriptyline)*(1000/75)+mean(CP.mixed.MC$Mianserin)*(1000/60)+mean(CP.mixed.MC$Sertraline)*(1000/50)+mean(CP.mixed.MC$Venlafaxine)*(1000/100)    is the equivalent of total antidepressants discharged (30116)
+# CI((CP.mixed.MC$Amytriptyline+CP.mixed.MC$Mianserin+CP.mixed.MC$Sertraline+CP.mixed.MC$Venlafaxine),ci=0.95) = [2.207,2.209], mean = 2.21 kg
+
 
 #stopCluster(cl)
+
+#############################################
+### Interpolated concentration approaches ###
+#############################################
+
+CP.datetime<-data.frame(date=as_date(GFCP.datetime),datetime=GFCP.datetime,round.datetime=ymd_hms(round_date(GFCP.datetime,unit="5 mins"))) # make the datetime round to match with the Q timeseries
+CP.Q.seq$DateTime<-ymd_hms(CP.Q.seq$DateTime)
+
+
+CP.zeros.dt<-left_join(CP.zeros,CP.datetime,by='date') #join the times to the conc
+CP.zeros.interpload<-left_join(CP.Q.seq,CP.zeros.dt,by=c('DateTime'='round.datetime'))
+for (i in 10:101){
+  CP.zeros.interpload[1:93,i]<-CP.zeros.interpload[94,i]
+  CP.zeros.interpload[,i]<-na.approx( CP.zeros.interpload[,i],na.rm = F) #linearly interpolate concentrations
+  CP.zeros.interpload[104942:nrow(CP.zeros.interpload),i]<-CP.zeros.interpload[104941,i]
+}
+CP.zeros.interpload$tot.conc<-rowSums(CP.zeros.interpload[,10:101])
+
+CP.zeros.interp.annual<-data.frame(matrix(ncol = 93, nrow = 1))
+names(CP.zeros.interp.annual)<-names(CP.zeros.interpload)[10:102]
+for (i in 1:ncol(CP.zeros.interp.annual)){
+  CP.zeros.interp.annual[1,i]<-sum(CP.zeros.interpload['Q_Ls']*CP.zeros.interpload[,i+9]*300/1e+09)
+}
+
+# CP.zeros.interp.annual$Acetaminophen*2   is the equivalent of acetaminophen tablets discharged (27964 tablets)
+# CP.zeros.interp.annual$Acetaminophen/1000 = 13.98 kg
+
+# CP.zeros.interp.annual$Ofloxacin*(1000/400)+mean(CP.zeros.interp.annual$Trimethoprim)*(1000/400)+mean(CP.zeros.interp.annual$Ciprofloxacin)    is the equivalent of total antibiotics discharged (744 doses)
+# CP.zeros.interp.annual$Ofloxacin+CP.zeros.interp.annual$Trimethoprim+CP.zeros.interp.annual$Ciprofloxacin = 336.0 g
+
+# CP.zeros.interp.annual$Amytriptyline*(1000/75)+mean(CP.zeros.interp.annual$Mianserin)*(1000/60)+mean(CP.zeros.interp.annual$Sertraline)*(1000/50)+mean(CP.zeros.interp.annual$Venlafaxine)*(1000/100)    is the equivalent of total antidepressants doses discharged (9054)
+# CP.zeros.interp.annual$Amytriptyline+CP.zeros.interp.annual$Mianserin+CP.zeros.interp.annual$Sertraline+CP.zeros.interp.annual$Venlafaxine = 729.1 g
+
+CP.halfdetect.dt<-left_join(CP.halfdetect,CP.datetime,by='date') #join the times to the conc
+CP.halfdetect.interpload<-left_join(CP.Q.seq,CP.halfdetect.dt,by=c('DateTime'='round.datetime'))
+for (i in 10:101){
+  CP.halfdetect.interpload[1:93,i]<-CP.halfdetect.interpload[94,i]
+  CP.halfdetect.interpload[,i]<-na.approx( CP.halfdetect.interpload[,i],na.rm = F) #linearly interpolate concentrations
+  CP.halfdetect.interpload[104942:nrow(CP.halfdetect.interpload),i]<-CP.halfdetect.interpload[104941,i]
+}
+CP.halfdetect.interpload$tot.conc<-rowSums(CP.halfdetect.interpload[,10:101])
+
+CP.halfdetect.interp.annual<-data.frame(matrix(ncol = 93, nrow = 1))
+names(CP.halfdetect.interp.annual)<-names(CP.halfdetect.interpload)[10:102]
+for (i in 1:ncol(CP.halfdetect.interp.annual)){
+  CP.halfdetect.interp.annual[1,i]<-sum(CP.halfdetect.interpload['Q_Ls']*CP.halfdetect.interpload[,i+9]*300/1e+09)
+}
+
+GFCP.interp<-rbind(CP.zeros.interp.annual,CP.halfdetect.interp.annual)
+GFCP.interp$method<-c("zeros","halfdetect")
+write.csv(GFCP.interp,"GFCP.interp.csv",row.names = F)
+
+# CP.halfdetect.interp.annual$Acetaminophen*2   is the equivalent of acetaminophen tablets discharged (30115 tablets)
+# CP.halfdetect.interp.annual$Acetaminophen/1000 = 15.06 kg
+
+# CP.halfdetect.interp.annual$Ofloxacin*(1000/400)+mean(CP.halfdetect.interp.annual$Trimethoprim)*(1000/400)+mean(CP.halfdetect.interp.annual$Ciprofloxacin)    is the equivalent of total antibiotics discharged (2296 doses)
+# CP.halfdetect.interp.annual$Ofloxacin+CP.halfdetect.interp.annual$Trimethoprim+CP.halfdetect.interp.annual$Ciprofloxacin = 1378 g
+
+# CP.halfdetect.interp.annual$Amytriptyline*(1000/75)+mean(CP.halfdetect.interp.annual$Mianserin)*(1000/60)+mean(CP.halfdetect.interp.annual$Sertraline)*(1000/50)+mean(CP.halfdetect.interp.annual$Venlafaxine)*(1000/100)    is the equivalent of total antidepressants doses discharged (50285 doses)
+# CP.halfdetect.interp.annual$Amytriptyline+CP.halfdetect.interp.annual$Mianserin+CP.halfdetect.interp.annual$Sertraline+CP.halfdetect.interp.annual$Venlafaxine = 3747 g
+
+### For the mixed approach, it matters which values end up where, so we'll use a resampling approach here:
+
+CP.mixed.list<-replicate(10000,CP.tidydrugs,simplify=F)
+ for (i in 1:length(CP.mixed.list)){
+  foo<-CP.mixed.list[[i]]
+  for (j in 3:ncol(CP.tidydrugs)){
+    foo[base::sample(which(is.na(foo[,j])),size=0.5*length(which(is.na(foo[,j])))),j]<-0
+    foo[,j]<-replace_na(foo[,j], DrugInfo[j-2,'LOQ']/2)
+  }
+  CP.mixed.list[[i]]<-left_join(foo,CP.datetime,by='date')
+}
+
+
+CP.mixed.interp.MC <- data.frame(matrix(ncol = 92, nrow = 10000))
+colnames(CP.mixed.interp.MC) <- colnames(CP.tidydrugs)[3:94]
+
+for (i in 1:length(CP.mixed.list)){
+  mango<-left_join(CP.Q.seq,CP.mixed.list[[i]],by=c('DateTime'='round.datetime'))
+   for (j in 1:92){
+      mango[1:93,j+9]<-mango[94,j+9]
+      mango[,j+9]<-na.approx(mango[,j+9],na.rm = F) #linearly interpolate concentrations
+      mango[104942:nrow(mango),j+9]<-mango[104941,j+9]  # now we have a dataframe for the interpolated concentrations of each drug over the Q timeseries, so we multiply each drug by Q and sum it to get annual flux, then and save each interaction in its own row of a dataframe
+      CP.mixed.interp.MC[i,j]<-sum(mango['Q_Ls']*mango[,j+9]*300/1e+09)
+     
+  }
+}  
+
+write.csv(CP.mixed.interp.MC,"GFCP.mixed_interpolation.BootstrapResults.csv",row.names = F)
+  
+# mean(CP.mixed.interp.MC$Acetaminophen)*2   is the equivalent of acetaminophen tablets discharged (29040 tablets)
+# CI(CP.mixed.interp.MC$Acetaminophen, ci=0.95) = [14.52, 14.52] mean = 14.52 kg 
+
+# mean(CP.mixed.interp.MC$Ofloxacin)*(1000/400)+mean(CP.mixed.interp.MC$Trimethoprim)*(1000/400)+mean(CP.mixed.interp.MC$Ciprofloxacin)    is the equivalent of total antibiotics discharged (1531 doses)
+# mean(CP.mixed.interp.MC$Ofloxacin)+mean(CP.mixed.interp.MC$Trimethoprim)+mean(CP.mixed.interp.MC$Ciprofloxacin) = 861 g
+
+# mean(CP.mixed.interp.MC$Amytriptyline)*(1000/75)+mean(CP.mixed.interp.MC$Mianserin)*(1000/60)+mean(CP.mixed.interp.MC$Sertraline)*(1000/50)+mean(CP.mixed.interp.MC$Venlafaxine)*(1000/100)    is the equivalent of total antidepressants doses discharged (29708 doses)
+# mean(CP.mixed.interp.MC$Amytriptyline)+mean(CP.mixed.interp.MC$Mianserin)+mean(CP.mixed.interp.MC$Sertraline)+mean(CP.mixed.interp.MC$Venlafaxine) = 2241 g
+
+```
+
+
+```{r Load estimates at Baisman Run}
+
+#use chemistry sampling time stamps to estimate time for pharma sampling
+chem.data<-read.csv(file="bes.waterchem.clean.csv", header=T)
+chem.data$Date<-dmy(chem.data$Date)
+chem.data$Site<-as.character(chem.data$Site)
+pharma.sampletimes<-subset(chem.data, Date>=ymd("171102") & Date <=ymd("181115"))[c("Date","time","Site")]
+
+#join the sample times to the drug data and subset for Baisman Run
+pharma.BARN<-subset(right_join(pharma.sampletimes,tidy.drugdata,by=c("Date"="date","Site"="site")),Site=="BARN")[-35,]
+
+#calculate an "average sampling time" to estimate the dates without recorded sampling time (n=3).
+samp.times<-matrix(unlist(strsplit(as.character(pharma.BARN$time[which(!is.na(pharma.BARN$time))]),":")), ncol=2, byrow=TRUE)
+mean(as.numeric(samp.times[,1])*60+as.numeric(samp.times[,2]))/60 #11.7
+0.7*60 #42 mins
+#average sampling time is 11:42 am, replace the NAs
+pharma.BARN$time[which(is.na(pharma.BARN$time))]<-"11:42"
+
+### using Q measurements within 30 min on either side of sample time, estimate instantaneous flow as the mean in this window (and also record the sd and N_Obs in the window)
+BARN.datetime<-ymd_hm(paste(pharma.BARN$Date,pharma.BARN$time))
+BARN.sample.Q<-list() #For each sample time, extract the Q in the window
+for (i in 1:length(BARN.datetime)){
+  BARN.sample.Q[[i]]<-subset(BARN.instaflow,ymd_hms(DateTime)>=BARN.datetime[i]-30*60&ymd_hms(DateTime)<=BARN.datetime[i]+30*60)
+}
+# Calculate mean flow in the window
+BARN.pharma.Q<-data.frame(Date=pharma.BARN$Date,time=pharma.BARN$time,Q.Ls.mean=rep(NA,times=length(pharma.BARN$time)),Q.Ls.sd=rep(NA,times=length(pharma.BARN$time)),Q.Ls.n=rep(NA,times=length(pharma.BARN$time)))
+for (i in 1:nrow(BARN.pharma.Q)){
+ BARN.pharma.Q$Q.Ls.mean[i]<-mean(BARN.sample.Q[[i]]$Q_Ls) 
+ BARN.pharma.Q$Q.Ls.sd[i]<-sd(BARN.sample.Q[[i]]$Q_Ls) 
+ BARN.pharma.Q$Q.Ls.n[i]<-length(BARN.sample.Q[[i]]$Q_Ls) 
+}
+
+BARN.load<-full_join(BARN.pharma.Q,pharma.BARN,by=c("Date"="Date","time"="time"))
+
+#plot the C-Q relationship for total.conc
+png("Figures/BARN.totalconc.vs.Q.png",height=12,width=12,units='cm',res=300)
+par(mar = c(3,3,0.8,0.5))
+par(mgp=c(1.3,0.2,0))
+plot(BARN.load$tot.conc+1~BARN.load$Q.Ls.mean,log="xy",xlab=expression(paste("Q (Ls"^-1,")")),ylab=expression(paste("sum concentration+1 (ng L"^-1,")")),pch=16,axes=F)
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+dev.off()
+
+
+### Load estimates for BARN!
+BARN.sub.names<-colnames(BARN.load)[colSums(!is.na(BARN.load)) > 0] #which drugs are detected at BARN
+BARN.subset<-BARN.load[names(BARN.load) %in% BARN.sub.names]
+
+#first, calculate and plot timeseries
+BARN.color<-left_join(data.frame(Names=BARN.sub.names[7:22],Class=DrugInfo[DrugInfo$Name %in% BARN.sub.names,]$Class),data.frame(Class=unique(DrugInfo[DrugInfo$Name %in% BARN.sub.names,]$Class),color=c("#8dd3c7",
+"#ffffb3",
+"#bebada",
+"#fb8072",
+"#80b1d3",
+"#fdb462",
+"#b3de69",
+"#fccde5",
+"#d9d9d9",
+"#bc80bd")))
+
+
+png("Figures/BARN.totalload.timeseries.png",height=10,width=15,units='cm',res=300)
+par(mar = c(3,3,0.8,0.5))
+par(mgp=c(1.3,0.2,0))
+plot((BARN.load$tot.conc*BARN.load$Q.Ls.mean)*3600/1E+09~ymd(BARN.load$Date),xlab="",ylab=expression(paste("load (g h"^-1,")")),type="n",axes=F)
+for (i in 1:length(BARN.sub.names[7:14])){
+points((BARN.load[,which(colnames(BARN.load)==BARN.sub.names[i+6])]*BARN.load$Q.Ls.mean)*3600/1e+09~ymd(BARN.load$Date),col=as.character(BARN.color$color[which(BARN.color$Names==BARN.sub.names[i+6])]),pch=16)  
+}
+points((BARN.load$tot.conc*BARN.load$Q.Ls.mean)*3600/1E+09~ymd(BARN.load$Date),pch=0,lwd=2)
+axis(1,tck=0.02, cex.axis=0.8,at=ymd(c("2017-11-01","2018-01-01","2018-03-01","2018-05-01","2018-07-01","2018-09-01","2018-11-01")),labels=c("Nov17","Jan18","Mar18","May18","Jul18","Sep18","Nov18")) 
+axis(2,tck=0.02,cex.axis=0.8)
+box()
+legend('topleft',c(as.character(unique(BARN.color$Class)),"TOTAL"),col = c(as.character(unique(BARN.color$color)),"black"),pch=c(rep(16,times=10),0),pt.lwd = c(rep(0,times=10),2),cex=0.75,bty="n")
+                                                                                                                    
+dev.off()
+
+#######################
+### Q interpolation ###
+#######################
+
+BARN.Q<-subset(BARN.instaflow,DateTime>=ymd_hms("2017-11-02 00:00:00") & DateTime<ymd_hms("2018-11-02 00:00:00"))
+fiveminseq<-data.frame(DateTime=seq(from=ymd_hms("2017-11-02 00:00:00"), to = ymd_hms("2018-11-01 23:55:00"),by='5 min')) # create a full time series for the year of discharge
+BARN.Q.seq<-left_join(fiveminseq,BARN.Q) # join the USGS Q to the full timeseries
+BARN.Q.seq$Q_Ls<-na.approx(BARN.Q.seq$Q_Ls,na.rm = F) # linearly interpolate missing Q values
+BARN.Q.seq$Q_Ls[105119:105120]<-BARN.Q.seq$Q_Ls[105118]
+
+#######################
+### Median approach ###
+#######################
+
+#Extrapolating mean concentrations: 
+BARN.tot.conc.med<-median(BARN.load$tot.conc) # 0
+BARN.tot.conc.mean<-mean(BARN.load$tot.conc) # 25.489
+BARN.tot.load<-sum(BARN.Q.seq$Q_Ls*BARN.tot.conc.mean*300)/1e+09 
+#Q measurements are every 5 mins; we estimate a total of 46.4 g pharmaceuticals pass through the pour point of Basiman Run
+
+BARN.antidepressant<-data.frame(amyt=BARN.load$Amytriptyline,mian=BARN.load$Mianserin,sertra=BARN.load$Sertraline)
+BARN.antidepressant[is.na(BARN.antidepressant)]<-0
+mean.antidepressant.prop<-with(subset(data.frame(antidepressant=rowSums(BARN.antidepressant),tot=BARN.load$tot.conc),tot>0),mean(antidepressant/tot)) 
+BARN.tot.load*mean.antidepressant.prop
+#on average, 40.5% of the total load at Baisman Run is antidepressants, meaning that the watershed is contributing  18.8 g of antidepressants annually
+
+#####################################
+### SET UP DIFFERENT "APPROACHES" ###
+#####################################
+
+## create three versions of the BARN drug data: all NAs filled with zeros, all NAs filled with 0.5 detection limit, and a 50-50 mix of the two:
+BARN.tidydrugs<-subset(tidy.drugdata,site=="BARN")
+BARN.zeros<-BARN.tidydrugs
+BARN.zeros[is.na(BARN.zeros)] = 0
+BARN.zeros$tot.conc<-rowSums(BARN.zeros[,3:94],na.rm = T)
+
+BARN.halfdetect<-BARN.tidydrugs
+for (i in 3:ncol(BARN.halfdetect)){
+  BARN.halfdetect[,i]<-replace_na(BARN.halfdetect[,i], DrugInfo[i-2,'LOQ']/2)
+}
+BARN.halfdetect$tot.conc<-rowSums(BARN.halfdetect[,3:94],na.rm = T)
+
+BARN.mixed<-BARN.tidydrugs
+for (i in 3:ncol(BARN.mixed)){
+  BARN.mixed[base::sample(which(is.na(BARN.mixed[,i])),size=0.5*length(which(is.na(BARN.mixed[,i])))),i]<-0
+    
+  BARN.mixed[,i]<-replace_na(BARN.mixed[,i], DrugInfo[i-2,'LOQ']/2)
+}
+BARN.mixed$tot.conc<-rowSums(BARN.mixed[,3:94],na.rm = T)
+
+#############################
+### Resampling approaches ###
+#############################
+
+# re-sample from each of these types for each drug and apply them to the discharge time-series
+
+#Set up the function "estimate load", which takes the inputs "site.type.drug" (a vector) specifying which site, the type of estimation for BDL data, and which drug (e.g. "BARN.zeros$tot.conc") and the site-specific, gap-filled Q timeseries (a vector, e.g. "BARN.Q.seq")
+estimate.load<- function(site.type.drug,Q.seq){ 
+  sample<-base::sample(site.type.drug,size = nrow(Q.seq),replace = T) # this part randomly samples from the concentrations, with replacement, and applies them to the discharge timeseries
+  tot.load<-sum(sample*Q.seq$Q_Ls*300)/1e+09 # this part multiplies concentration by discharge and sums over the discharge time series to give a total load in grams
+  return(tot.load)
+}
+
+### NOW, apply a bootstrap, and repeat it for each drug and each type of estimation
+
+runs<-10000
+
+cl <- makeCluster(3)
+registerDoParallel(cl)  # initiate the cluster to run in parallel
+
+#BARN.zeros.MC<-list()
+#for (i in 3:ncol(BARN.zeros)){
+#  BARN.zeros.MC[[i-2]]<-replicate(runs,estimate.load(BARN.zeros[,i],BARN.Q.seq))
+#}
+#names(BARN.zeros.MC)<-colnames(BARN.zeros)[3:ncol(BARN.zeros)]
+
+BARN.zeros.MC <- foreach(i=3:ncol(BARN.zeros), .combine = "cbind.data.frame") %dopar% { 
+  replicate(runs,estimate.load(BARN.zeros[,i],BARN.Q.seq))
+}
+names(BARN.zeros.MC)<-colnames(BARN.zeros)[3:ncol(BARN.zeros)]
+# write.csv(BARN.zeros.MC,'BARN.bootstrappedfluxes.zeros.csv',row.names = F)
+
+# no acetaminophen here
+
+# mean(BARN.zeros.MC$Amytriptyline)*(1000/75)+mean(BARN.zeros.MC$Mianserin)*(1000/60)+mean(BARN.zeros.MC$Sertraline)*(1000/50)    is the equivalent of total antidepressants discharged (167.5)
+# CI((BARN.zeros.MC$Amytriptyline+BARN.zeros.MC$Mianserin+BARN.zeros.MC$Sertraline),ci=0.95) = [11.19,11.20], mean = 11.20 g
+
+# mean(BARN.zeros.MC$Cilazapril)*(1000/2.5)+mean(BARN.zeros.MC$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin agents doses discharged (255.5)
+# CI((BARN.zeros.MC$Cilazapril+BARN.zeros.MC$Irbesartan),ci=0.95) = [29.0, 29.0], mean = 29.0 
+
+# mean(BARN.zeros.MC$Trimethoprim)*(1000/400)   is the equivalent of total doses of Trimethoprim discharged (1.48)
+# CI(BARN.zeros.MC$Trimethoprim,ci=0.95) = [0.593, 0.594], mean = 0.593 g
+
+BARN.halfdetect.MC <- foreach(i=3:ncol(BARN.halfdetect), .combine = "cbind.data.frame") %dopar% { 
+  replicate(runs,estimate.load(BARN.halfdetect[,i],BARN.Q.seq))
+}
+names(BARN.halfdetect.MC)<-colnames(BARN.halfdetect)[3:ncol(BARN.halfdetect)]
+# write.csv(BARN.halfdetect.MC,'BARN.bootstrappedfluxes.halfdetect.csv',row.names = F)
+
+# no acetaminophen here
+
+# mean(BARN.halfdetect.MC$Amytriptyline)*(1000/75)+mean(BARN.halfdetect.MC$Mianserin)*(1000/60)+mean(BARN.halfdetect.MC$Sertraline)*(1000/50)    is the equivalent of total antidepressants discharged (502)
+# CI((BARN.halfdetect.MC$Amytriptyline+BARN.halfdetect.MC$Mianserin+BARN.halfdetect.MC$Sertraline),ci=0.95) = [31.22,31.24], mean = 31.23 g
+
+# mean(BARN.halfdetect.MC$Cilazapril)*(1000/2.5)+mean(BARN.halfdetect.MC$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin agents doses discharged (969)
+# CI((BARN.halfdetect.MC$Cilazapril+BARN.halfdetect.MC$Irbesartan),ci=0.95) = [33.3, 33.4], mean = 33.3 
+
+# mean(BARN.halfdetect.MC$Trimethoprim)*(1000/400)   is the equivalent of total doses of Trimethoprim discharged (7.56)
+# CI(BARN.halfdetect.MC$Trimethoprim,ci=0.95) = [3.03, 3.03], mean = 3.03 g
+
+
+
+BARN.mixed.MC <- foreach(i=3:ncol(BARN.mixed), .combine = "cbind.data.frame") %dopar% { 
+  replicate(runs,estimate.load(BARN.mixed[,i],BARN.Q.seq))
+}
+names(BARN.mixed.MC)<-colnames(BARN.mixed)[3:ncol(BARN.mixed)]
+# write.csv(BARN.mixed.MC,'BARN.bootstrappedfluxes.mixed.csv',row.names = F)
+
+# no acetaminophen here
+
+# mean(BARN.mixed.MC$Amytriptyline)*(1000/75)+mean(BARN.mixed.MC$Mianserin)*(1000/60)+mean(BARN.mixed.MC$Sertraline)*(1000/50)    is the equivalent of total antidepressants discharged (337)
+# CI((BARN.mixed.MC$Amytriptyline+BARN.mixed.MC$Mianserin+BARN.mixed.MC$Sertraline),ci=0.95) = [21.33,21.35], mean = 21.34 g
+
+# mean(BARN.mixed.MC$Cilazapril)*(1000/2.5)+mean(BARN.mixed.MC$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin agents doses discharged (612)
+# CI((BARN.mixed.MC$Cilazapril+BARN.mixed.MC$Irbesartan),ci=0.95) = [31.11, 31.17], mean = 31.14 
+
+# mean(BARN.mixed.MC$Trimethoprim)*(1000/400)   is the equivalent of total doses of Trimethoprim discharged (4.60)
+# CI(BARN.mixed.MC$Trimethoprim,ci=0.95) = [1.84, 1.84], mean = 1.84 g
+
+
+
+### Compare these to some of the loads in WWTP effluent from Verlicchi et al. 2012 STOTEN: 
+
+# CI(BARN.mixed.MC$Metoprolol, ci=0.95)  = [7.45, 7.46] mean = 7.46 g 
+# (7.46/365/(how many people in BAisman Run?))*1000 =  mg compared to their ~90 mg
+
+# CI(BARN.mixed.MC$Trimethoprim, ci=0.95)  = [1.838, 1.839] mean = 1.839 g 
+# (1.839/365/(How many people in Baisman Run?))*1000 = mg compared to their ~125 mg
+
+# stopCluster(cl)
+
+#############################################
+### Interpolated concentration approaches ###
+#############################################
+
+BARN.datetime<-data.frame(date=as_date(BARN.datetime),datetime=BARN.datetime,round.datetime=ymd_hms(round_date(BARN.datetime,unit="5 mins"))) # make the datetime round to match with the Q timeseries
+BARN.Q.seq$DateTime<-ymd_hms(BARN.Q.seq$DateTime)
+
+
+BARN.zeros.dt<-left_join(BARN.zeros,BARN.datetime,by='date') #join the times to the conc
+BARN.zeros.interpload<-left_join(BARN.Q.seq,BARN.zeros.dt,by=c('DateTime'='round.datetime'))
+for (i in 10:101){
+  BARN.zeros.interpload[1:140,i]<-BARN.zeros.interpload[141,i]
+  BARN.zeros.interpload[,i]<-na.approx( BARN.zeros.interpload[,i],na.rm = F) #linearly interpolate concentrations
+  BARN.zeros.interpload[104965:nrow(BARN.zeros.interpload),i]<-BARN.zeros.dt[45,i-7]
+}
+BARN.zeros.interpload$tot.conc<-rowSums(BARN.zeros.interpload[,10:101])
+
+BARN.zeros.interp.annual<-data.frame(matrix(ncol = 93, nrow = 1))
+names(BARN.zeros.interp.annual)<-names(BARN.zeros.interpload)[10:102]
+for (i in 1:ncol(BARN.zeros.interp.annual)){
+  BARN.zeros.interp.annual[1,i]<-sum(BARN.zeros.interpload['Q_Ls']*BARN.zeros.interpload[,i+9]*300/1e+09)
+}
+# no acetaminophen here
+
+# mean(BARN.zeros.interp.annual$Amytriptyline)*(1000/75)+mean(BARN.zeros.interp.annual$Mianserin)*(1000/60)+mean(BARN.zeros.interp.annual$Sertraline)*(1000/50)    is the equivalent of total antidepressants discharged (134)
+# BARN.zeros.interp.annual$Amytriptyline+BARN.zeros.interp.annual$Mianserin+BARN.zeros.interp.annual$Sertraline = 8.854 g
+
+# mean(BARN.zeros.interp.annual$Cilazapril)*(1000/2.5)+mean(BARN.zeros.interp.annual$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin agents doses discharged (109)
+# BARN.zeros.interp.annual$Cilazapril+BARN.zeros.interp.annual$Irbesartan = 6.954 g 
+
+# mean(BARN.zeros.interp.annual$Trimethoprim)*(1000/400)   is the equivalent of total doses of Trimethoprim discharged (1)
+
+BARN.halfdetect.dt<-left_join(BARN.halfdetect,BARN.datetime,by='date') #join the times to the conc
+BARN.halfdetect.interpload<-left_join(BARN.Q.seq,BARN.halfdetect.dt,by=c('DateTime'='round.datetime'))
+for (i in 10:101){
+  BARN.halfdetect.interpload[1:140,i]<-BARN.halfdetect.interpload[141,i]
+  BARN.halfdetect.interpload[,i]<-na.approx( BARN.halfdetect.interpload[,i],na.rm = F) #linearly interpolate concentrations
+  BARN.halfdetect.interpload[104965:nrow(BARN.halfdetect.interpload),i]<-BARN.halfdetect.dt[45,i-7]
+}
+BARN.halfdetect.interpload$tot.conc<-rowSums(BARN.halfdetect.interpload[,10:101])
+
+BARN.halfdetect.interp.annual<-data.frame(matrix(ncol = 93, nrow = 1))
+names(BARN.halfdetect.interp.annual)<-names(BARN.halfdetect.interpload)[10:102]
+for (i in 1:ncol(BARN.halfdetect.interp.annual)){
+  BARN.halfdetect.interp.annual[1,i]<-sum(BARN.halfdetect.interpload['Q_Ls']*BARN.halfdetect.interpload[,i+9]*300/1e+09)
+}
+
+BARN.interp<-rbind(BARN.zeros.interp.annual,BARN.halfdetect.interp.annual)
+BARN.interp$method<-c("zeros","halfdetect")
+write.csv(BARN.interp,"BARN.interp.csv",row.names = F)
+
+# no acetaminophen here
+
+# mean(BARN.halfdetect.interp.annual$Amytriptyline)*(1000/75)+mean(BARN.halfdetect.interp.annual$Mianserin)*(1000/60)+mean(BARN.halfdetect.interp.annual$Sertraline)*(1000/50)    is the equivalent of total antidepressants discharged (472)
+# BARN.halfdetect.interp.annual$Amytriptyline+BARN.halfdetect.interp.annual$Mianserin+BARN.halfdetect.interp.annual$Sertraline = 29.13 g
+
+# mean(BARN.halfdetect.interp.annual$Cilazapril)*(1000/2.5)+mean(BARN.halfdetect.interp.annual$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin agents doses discharged (823)
+# BARN.halfdetect.interp.annual$Cilazapril+BARN.halfdetect.interp.annual$Irbesartan = 11.4 g 
+
+# mean(BARN.halfdetect.interp.annual$Trimethoprim)*(1000/400)   is the equivalent of total doses of Trimethoprim discharged (7.4)
+
+### For the mixed approach, it matters which values end up where, so we'll use a resampling approach here:
+
+BARN.mixed.list<-replicate(10000,BARN.tidydrugs,simplify=F)
+ for (i in 1:length(BARN.mixed.list)){
+  foo<-BARN.mixed.list[[i]]
+  for (j in 3:ncol(BARN.tidydrugs)){
+    foo[base::sample(which(is.na(foo[,j])),size=0.5*length(which(is.na(foo[,j])))),j]<-0
+    foo[,j]<-replace_na(foo[,j], DrugInfo[j-2,'LOQ']/2)
+  }
+  BARN.mixed.list[[i]]<-left_join(foo,BARN.datetime,by='date')
+}
+
+
+BARN.mixed.interp.MC <- data.frame(matrix(ncol = 92, nrow = 10000))
+colnames(BARN.mixed.interp.MC) <- colnames(BARN.tidydrugs)[3:94]
+
+for (i in 1:length(BARN.mixed.list)){
+  mango<-left_join(BARN.Q.seq,BARN.mixed.list[[i]],by=c('DateTime'='round.datetime'))
+   for (j in 1:92){
+      mango[1:140,j+9]<-mango[141,j+9]
+      mango[,j+9]<-na.approx(mango[,j+9],na.rm = F) #linearly interpolate concentrations
+      mango[104965:nrow(mango),j+9]<-mango[104964,j+9]  # now we have a dataframe for the interpolated concentrations of each drug over the Q timeseries, so we multiply each drug by Q and sum it to get annual flux, then and save each interaction in its own row of a dataframe
+      BARN.mixed.interp.MC[i,j]<-sum(mango['Q_Ls']*mango[,j+9]*300/1e+09)
+     
+  }
+}  
+
+write.csv(BARN.mixed.interp.MC,"BARN.mixed_interpolation.BootstrapResults.csv",row.names = F)
+  
+# no acetaminophen here
+
+# mean(BARN.mixed.interp.MC$Amytriptyline)*(1000/75)+mean(BARN.mixed.interp.MC$Mianserin)*(1000/60)+mean(BARN.mixed.interp.MC$Sertraline)*(1000/50)    is the equivalent of total antidepressants discharged (306)
+# CI(BARN.mixed.interp.MC$Amytriptyline+BARN.mixed.interp.MC$Mianserin+BARN.mixed.interp.MC$Sertraline, ci = 0.95) = [19.11, 19.14], mean = 19.12 g
+
+# mean(BARN.mixed.interp.MC$Cilazapril)*(1000/2.5)+mean(BARN.mixed.interp.MC$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin agents doses discharged (466)
+# CI(BARN.mixed.interp.MC$Cilazapril+BARN.mixed.interp.MC$Irbesartan,ci= 0.95) = [9.17, 9.18], mean = 9.18 g 
+
+# mean(BARN.mixed.interp.MC$Trimethoprim)*(1000/400)   is the equivalent of total doses of Trimethoprim discharged (4.3)
+
+```
+
+
+```{r Load estimates at Dead Run}
+
+#use chemistry sampling time stamps to estimate time for pharma sampling - here we have to take a slightly different strategy since we don't have any info on DRKR sample times during this time period. Instead, we infer them based on the average time difference between the other sites for time periods when they were all sampled
+chem.data<-read.csv(file="bes.waterchem.clean.csv", header=T)
+chem.data$Date<-dmy(chem.data$Date)
+chem.data$Site<-as.character(chem.data$Site)
+pharma.sampletimecalc.DRKR<-subset(chem.data, Date>=ymd("161102") & Date <=ymd("170329"))[c("Date","time","Site")] 
+
+GFCP.DRKR.diffs<-rep(NA,times=length(unique(pharma.sampletimecalc.DRKR$Date)))
+for (i in 1:length(unique(pharma.sampletimecalc.DRKR$Date))){
+  GFCP.DRKR.diffs[i]<-with(subset(pharma.sampletimecalc.DRKR,Date == unique(pharma.sampletimecalc.DRKR$Date)[i]),difftime(as.POSIXct(as.character(time[which(Site=="DRKR")]),format="%H:%M"),as.POSIXct(as.character(time[which(Site=="GFCP")]),format="%H:%M"),units = "mins"))
+}
+# CI(GFCP.DRKR.diffs,ci=0.95), mean of lag from GFCP sampling time = 66 min, [61,71]
+
+pharma.sampletimes<-subset(chem.data, Site=="GFCP" & Date>=ymd("171102") & Date <=ymd("181115"))[c("Date","time","Site")]
+pharma.sampletimes$time[20]<-NA
+#calculate an "average sampling time" to estimate the dates without recorded sampling time (n=3).
+samp.times<-matrix(unlist(strsplit(as.character(pharma.sampletimes$time[which(!is.na(pharma.sampletimes$time))]),":")), ncol=2, byrow=TRUE)
+mean(as.numeric(samp.times[,1])*60+as.numeric(samp.times[,2]))/60 #8.484496
+0.484496*60 #29 mins
+#average sampling time is 8:29 am, replace the NAs
+pharma.sampletimes$time[which(is.na(pharma.sampletimes$time))]<-"8:29"
+pharma.sampletimes$DRKR.times<-hms::as.hms(as.POSIXct(as.character(pharma.sampletimes$time),format="%H:%M")+66*60)
+
+#join the sample times to the drug data and subset for Dead Run
+pharma.DRKR<-right_join(pharma.sampletimes,subset(tidy.drugdata,site=="DRKR"),by=c("Date"="date"))[,-c(2,3)]
+pharma.DRKR$DRKR.times[32]<-"9:35:00"
+
+
+### using Q measurements within 30 min on either side of sample time, estimate instantaneous flow as the mean in this window (and also record the sd and N_Obs in the window)
+DRKR.datetime<-ymd_hms(paste(pharma.DRKR$Date,pharma.DRKR$DRKR.times))
+DRKR.sample.Q<-list() #For each sample time, extract the Q in the window
+for (i in 1:length(DRKR.datetime)){
+  DRKR.sample.Q[[i]]<-subset(DRKR.instaflow,ymd_hms(DateTime)>=DRKR.datetime[i]-30*60&ymd_hms(DateTime)<=DRKR.datetime[i]+30*60)
+}
+# Calculate mean flow in the window
+DRKR.pharma.Q<-data.frame(Date=pharma.DRKR$Date,time=pharma.DRKR$DRKR.times,Q.Ls.mean=rep(NA,times=length(pharma.DRKR$DRKR.times)),Q.Ls.sd=rep(NA,times=length(pharma.DRKR$DRKR.times)),Q.Ls.n=rep(NA,times=length(pharma.DRKR$DRKR.times)))
+for (i in 1:nrow(DRKR.pharma.Q)){
+ DRKR.pharma.Q$Q.Ls.mean[i]<-mean(DRKR.sample.Q[[i]]$Q_Ls) 
+ DRKR.pharma.Q$Q.Ls.sd[i]<-sd(DRKR.sample.Q[[i]]$Q_Ls) 
+ DRKR.pharma.Q$Q.Ls.n[i]<-length(DRKR.sample.Q[[i]]$Q_Ls) 
+}
+
+DRKR.load<-full_join(DRKR.pharma.Q,pharma.DRKR,by=c("Date"="Date","time"="DRKR.times"))
+
+#plot the C-Q relationship for total.conc
+png("Figures/DRKR.totalconc.vs.Q.png",height=12,width=12,units='cm',res=300)
+par(mar = c(3,3,0.8,0.5))
+par(mgp=c(1.3,0.2,0))
+plot(DRKR.load$tot.conc+1~DRKR.load$Q.Ls.mean,log="xy",xlab=expression(paste("Q (Ls"^-1,")")),ylab=expression(paste("sum concentration+1 (ng L"^-1,")")),pch=16,axes=F)
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+dev.off()
+
+
+### Load estimates for DRKR!
+DRKR.sub.names<-colnames(DRKR.load)[colSums(!is.na(DRKR.load)) > 0] #which drugs are detected at DRKR
+DRKR.subset<-DRKR.load[names(DRKR.load) %in% DRKR.sub.names]
+
+#first, calculate and plot timeseries
+DRKR.color<-left_join(data.frame(Names=DRKR.sub.names[7:24],Class=DrugInfo[DrugInfo$Name %in% DRKR.sub.names,]$Class),data.frame(Class=unique(DrugInfo[DrugInfo$Name %in% DRKR.sub.names,]$Class),color=c("#8dd3c7",
+"#ffffb3",
+"#bebada",
+"#fb8072",
+"#80b1d3",
+"#fdb462",
+"#b3de69",
+"#fccde5")))
+
+
+png("Figures/DRKR.totalload.timeseries.png",height=10,width=15,units='cm',res=300)
+par(mar = c(3,3,0.8,0.5))
+par(mgp=c(1.3,0.2,0))
+plot((DRKR.load$tot.conc*DRKR.load$Q.Ls.mean)*3600/1E+09~ymd(DRKR.load$Date),xlab="",ylab=expression(paste("load (g h"^-1,")")),type="n",axes=F)
+for (i in 1:length(DRKR.sub.names[7:14])){
+points((DRKR.load[,which(colnames(DRKR.load)==DRKR.sub.names[i+6])]*DRKR.load$Q.Ls.mean)*3600/1e+09~ymd(DRKR.load$Date),col=as.character(DRKR.color$color[which(DRKR.color$Names==DRKR.sub.names[i+6])]),pch=16)  
+}
+points((DRKR.load$tot.conc*DRKR.load$Q.Ls.mean)*3600/1E+09~ymd(DRKR.load$Date),pch=0,lwd=2)
+axis(1,tck=0.02, cex.axis=0.8,at=ymd(c("2017-11-01","2018-01-01","2018-03-01","2018-05-01","2018-07-01","2018-09-01","2018-11-01")),labels=c("Nov17","Jan18","Mar18","May18","Jul18","Sep18","Nov18")) 
+axis(2,tck=0.02,cex.axis=0.8)
+box()
+legend('topright',c(as.character(unique(DRKR.color$Class)),"TOTAL"),col = c(as.character(unique(DRKR.color$color)),"black"),pch=c(rep(16,times=8),0),pt.lwd = c(rep(0,times=8),2),cex=0.75)
+                                                                                                                    
+dev.off()
+
+#######################
+### Q interpolation ###
+#######################
+
+DRKR.Q<-subset(DRKR.instaflow,DateTime>=ymd_hms("2017-11-02 00:00:00") & DateTime<ymd_hms("2018-11-02 00:00:00"))
+fiveminseq<-data.frame(DateTime=seq(from=ymd_hms("2017-11-02 00:00:00"), to = ymd_hms("2018-11-01 23:55:00"),by='5 min')) # create a full time series for the year of discharge
+DRKR.Q.seq<-left_join(fiveminseq,DRKR.Q) # join the USGS Q to the full timeseries
+DRKR.Q.seq$Q_Ls<-na.approx(DRKR.Q.seq$Q_Ls,na.rm = F) # linearly interpolate missing Q values
+DRKR.Q.seq$Q_Ls[105119:105120]<-DRKR.Q.seq$Q_Ls[105118]
+
+#######################
+### Median approach ###
+#######################
+
+#Extrapolating mean concentrations: 
+DRKR.tot.conc.med<-median(DRKR.load$tot.conc) # 6
+DRKR.tot.conc.mean<-mean(DRKR.load$tot.conc) # 37
+DRKR.tot.load.med<-sum(DRKR.Q.seq$Q_Ls*DRKR.tot.conc.med*300)/1e+09
+DRKR.tot.load.mean<-sum(DRKR.Q.seq$Q_Ls*DRKR.tot.conc.mean*300)/1e+09 
+#Q measurements are every 5 mins; we estimate a total of 85.9 g pharmaceuticals pass through the pour point of Dead Run
+
+DRKR.antidepressant<-data.frame(amyt=DRKR.load$Amytriptyline,mian=DRKR.load$Mianserin,sertra=DRKR.load$Sertraline)
+DRKR.antidepressant[is.na(DRKR.antidepressant)]<-0
+mean.antidepressant.prop<-with(subset(data.frame(antidepressant=rowSums(DRKR.antidepressant),tot=DRKR.load$tot.conc),tot>0),mean(antidepressant/tot)) 
+DRKR.tot.load.med*mean.antidepressant.prop
+DRKR.tot.load.mean*mean.antidepressant.prop
+#on average, 8.39% of the total load at Dead Run is antidepressants, meaning that the watershed is contributing  7.2 g (median) to 44.24 g (mean) of antidepressants annually
+
+DRKR.antibiotic<-data.frame(cipro=DRKR.load$Ciprofloxacin,norf=DRKR.load$Norfloxacin,oflox=DRKR.load$Ofloxacin,trim=DRKR.load$Trimethoprim)
+DRKR.antibiotic[is.na(DRKR.antibiotic)]<-0
+mean.antibiotic.prop<-with(subset(data.frame(antibiotic=rowSums(DRKR.antibiotic),tot=DRKR.load$tot.conc),tot>0),mean(antibiotic/tot)) 
+DRKR.tot.load.med*mean.antibiotic.prop
+DRKR.tot.load.mean*mean.antibiotic.prop
+#on average, 57.16% of the total load at Dead Run is antibiotics, meaning that the watershed is contributing  49.1 g (median) to 302.7 g (mean) of antibiotics annually
+
+#####################################
+### SET UP DIFFERENT "APPROACHES" ###
+#####################################
+
+## create three versions of the DRKR drug data: all NAs filled with zeros, all NAs filled with 0.5 detection limit, and a 50-50 mix of the two:
+DRKR.tidydrugs<-subset(tidy.drugdata,site=="DRKR")
+DRKR.zeros<-DRKR.tidydrugs
+DRKR.zeros[is.na(DRKR.zeros)] = 0
+DRKR.zeros$tot.conc<-rowSums(DRKR.zeros[,3:94],na.rm = T)
+
+DRKR.halfdetect<-DRKR.tidydrugs
+for (i in 3:ncol(DRKR.halfdetect)){
+  DRKR.halfdetect[,i]<-replace_na(DRKR.halfdetect[,i], DrugInfo[i-2,'LOQ']/2)
+}
+DRKR.halfdetect$tot.conc<-rowSums(DRKR.halfdetect[,3:94],na.rm = T)
+
+DRKR.mixed<-DRKR.tidydrugs
+for (i in 3:ncol(DRKR.mixed)){
+  DRKR.mixed[base::sample(which(is.na(DRKR.mixed[,i])),size=0.5*length(which(is.na(DRKR.mixed[,i])))),i]<-0
+    
+  DRKR.mixed[,i]<-replace_na(DRKR.mixed[,i], DrugInfo[i-2,'LOQ']/2)
+}
+DRKR.mixed$tot.conc<-rowSums(DRKR.mixed[,3:94],na.rm = T)
+
+#############################
+### Resampling approaches ###
+#############################
+
+# re-sample from each of these types for each drug and apply them to the discharge time-series
+
+#Set up the function "estimate load", which takes the inputs "site.type.drug" (a vector) specifying which site, the type of estimation for BDL data, and which drug (e.g. "DRKR.zeros$tot.conc") and the site-specific, gap-filled Q timeseries (a vector, e.g. "DRKR.Q.seq")
+estimate.load<- function(site.type.drug,Q.seq){ 
+  sample<-base::sample(site.type.drug,size = nrow(Q.seq),replace = T) # this part randomly samples from the concentrations, with replacement, and applies them to the discharge timeseries
+  tot.load<-sum(sample*Q.seq$Q_Ls*300)/1e+09 # this part multiplies concentration by discharge and sums over the discharge time series to give a total load in grams
+  return(tot.load)
+}
+
+### NOW, apply a bootstrap, and repeat it for each drug and each type of estimation
+
+runs<-10000
+
+cl <- makeCluster(3)
+registerDoParallel(cl)  # initiate the cluster to run in parallel
+
+#DRKR.zeros.MC<-list()
+#for (i in 3:ncol(DRKR.zeros)){
+#  DRKR.zeros.MC[[i-2]]<-replicate(runs,estimate.load(DRKR.zeros[,i],DRKR.Q.seq))
+#}
+#names(DRKR.zeros.MC)<-colnames(DRKR.zeros)[3:ncol(DRKR.zeros)]
+
+DRKR.zeros.MC <- foreach(i=3:ncol(DRKR.zeros), .combine = "cbind.data.frame") %dopar% { 
+  replicate(runs,estimate.load(DRKR.zeros[,i],DRKR.Q.seq))
+}
+names(DRKR.zeros.MC)<-colnames(DRKR.zeros)[3:ncol(DRKR.zeros)]
+# write.csv(DRKR.zeros.MC,'DRKR.bootstrappedfluxes.zeros.csv',row.names = F)
+
+# mean(DRKR.zeros.MC$Acetaminophen)*2   is the equivalent of acetaminophen tablets discharged (98)
+# CI(DRKR.zeros.MC$Acetaminophen, ci=0.95) = [49.0, 49.2], mean = 49.1 g
+
+# mean(DRKR.zeros.MC$Amytriptyline)*(1000/75)+mean(DRKR.zeros.MC$Mianserin)*(1000/60)+mean(DRKR.zeros.MC$Sertraline)*(1000/50)    is the equivalent of total antidepressants discharged (3387)
+# CI((DRKR.zeros.MC$Amytriptyline+DRKR.zeros.MC$Mianserin+DRKR.zeros.MC$Sertraline),ci=0.95) = [247.9, 249.1], mean = 248.5 g
+
+# mean(DRKR.zeros.MC$Cilazapril)*(1000/2.5)+mean(DRKR.zeros.MC$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin agents doses discharged (4409)
+# CI((DRKR.zeros.MC$Cilazapril+DRKR.zeros.MC$Irbesartan),ci=0.95) = [58.6, 58.8], mean = 58.7 
+
+# mean(DRKR.zeros.MC$Trimethoprim)*(1000/400)+mean(DRKR.zeros.MC$Ciprofloxacin)+mean(DRKR.zeros.MC$Norfloxacin)*(1000/800)+mean(DRKR.zeros.MC$Ofloxacin)*(1000/400)   is the equivalent of total doses of total antibiotics discharged (203)
+# CI(DRKR.zeros.MC$Trimethoprim+DRKR.zeros.MC$Ciprofloxacin+DRKR.zeros.MC$Norfloxacin+DRKR.zeros.MC$Ofloxacin,ci=0.95) = [101.0, 101.2], mean = 101.1 g
+
+DRKR.halfdetect.MC <- foreach(i=3:ncol(DRKR.halfdetect), .combine = "cbind.data.frame") %dopar% { 
+  replicate(runs,estimate.load(DRKR.halfdetect[,i],DRKR.Q.seq))
+}
+names(DRKR.halfdetect.MC)<-colnames(DRKR.halfdetect)[3:ncol(DRKR.halfdetect)]
+# write.csv(DRKR.halfdetect.MC,'DRKR.bootstrappedfluxes.halfdetect.csv',row.names = F)
+
+# mean(DRKR.halfdetect.MC$Acetaminophen)*2   is the equivalent of acetaminophen tablets discharged (510)
+# CI(DRKR.halfdetect.MC$Acetaminophen, ci=0.95) = [254.9, 255.1], mean = 255.0 g
+
+# mean(DRKR.halfdetect.MC$Amytriptyline)*(1000/75)+mean(DRKR.halfdetect.MC$Mianserin)*(1000/60)+mean(DRKR.halfdetect.MC$Sertraline)*(1000/50)    is the equivalent of total antidepressants discharged (6043)
+# CI((DRKR.halfdetect.MC$Amytriptyline+DRKR.halfdetect.MC$Mianserin+DRKR.halfdetect.MC$Sertraline),ci=0.95) = [407.1, 408.3], mean = 407.7 g
+
+# mean(DRKR.halfdetect.MC$Cilazapril)*(1000/2.5)+mean(DRKR.halfdetect.MC$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin agents doses discharged (9570)
+# CI((DRKR.halfdetect.MC$Cilazapril+DRKR.halfdetect.MC$Irbesartan),ci=0.95) = [91.7, 92.0], mean = 91.8 
+
+# mean(DRKR.halfdetect.MC$Trimethoprim)*(1000/400)+mean(DRKR.halfdetect.MC$Ciprofloxacin)+mean(DRKR.halfdetect.MC$Norfloxacin)*(1000/800)+mean(DRKR.halfdetect.MC$Ofloxacin)*(1000/400)   is the equivalent of total doses of total antibiotics discharged (516)
+# CI(DRKR.halfdetect.MC$Trimethoprim+DRKR.halfdetect.MC$Ciprofloxacin+DRKR.halfdetect.MC$Norfloxacin+DRKR.halfdetect.MC$Ofloxacin,ci=0.95) = [333.9, 334.0], mean = 333.9 g
+
+
+DRKR.mixed.MC <- foreach(i=3:ncol(DRKR.mixed), .combine = "cbind.data.frame") %dopar% { 
+  replicate(runs,estimate.load(DRKR.mixed[,i],DRKR.Q.seq))
+}
+names(DRKR.mixed.MC)<-colnames(DRKR.mixed)[3:ncol(DRKR.mixed)]
+# write.csv(DRKR.mixed.MC,'DRKR.bootstrappedfluxes.mixed.csv',row.names = F)
+
+# mean(DRKR.mixed.MC$Acetaminophen)*2   is the equivalent of acetaminophen tablets discharged (308)
+# CI(DRKR.mixed.MC$Acetaminophen, ci=0.95) = [154.1, 154.3], mean = 154.2 g
+
+# mean(DRKR.mixed.MC$Amytriptyline)*(1000/75)+mean(DRKR.mixed.MC$Mianserin)*(1000/60)+mean(DRKR.mixed.MC$Sertraline)*(1000/50)    is the equivalent of total antidepressants discharged (4742)
+# CI((DRKR.mixed.MC$Amytriptyline+DRKR.mixed.MC$Mianserin+DRKR.mixed.MC$Sertraline),ci=0.95) = [329.4, 330.7], mean = 330.1 g
+
+# mean(DRKR.mixed.MC$Cilazapril)*(1000/2.5)+mean(DRKR.mixed.MC$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin agents doses discharged (7062)
+# CI((DRKR.mixed.MC$Cilazapril+DRKR.mixed.MC$Irbesartan),ci=0.95) = [75.62, 75.86], mean = 75.74 g 
+
+# mean(DRKR.mixed.MC$Trimethoprim)*(1000/400)+mean(DRKR.mixed.MC$Ciprofloxacin)+mean(DRKR.mixed.MC$Norfloxacin)*(1000/800)+mean(DRKR.mixed.MC$Ofloxacin)*(1000/400)   is the equivalent of total doses of total antibiotics discharged (360)
+# CI(DRKR.mixed.MC$Trimethoprim+DRKR.mixed.MC$Ciprofloxacin+DRKR.mixed.MC$Norfloxacin+DRKR.mixed.MC$Ofloxacin,ci=0.95) = [218.2, 218.3], mean = 218.2 g
+
+# stopCluster(cl)
+
+#############################################
+### Interpolated concentration approaches ###
+#############################################
+
+DRKR.datetime<-data.frame(date=as_date(DRKR.datetime),datetime=DRKR.datetime,round.datetime=ymd_hms(round_date(DRKR.datetime,unit="5 mins"))) # make the datetime round to match with the Q timeseries
+DRKR.Q.seq$DateTime<-ymd_hms(DRKR.Q.seq$DateTime)
+
+
+DRKR.zeros.dt<-left_join(DRKR.zeros,DRKR.datetime,by='date') #join the times to the conc
+DRKR.zeros.interpload<-left_join(DRKR.Q.seq,DRKR.zeros.dt,by=c('DateTime'='round.datetime'))
+for (i in 10:101){
+  DRKR.zeros.interpload[1:106,i]<-DRKR.zeros.interpload[107,i]
+  DRKR.zeros.interpload[,i]<-na.approx( DRKR.zeros.interpload[,i],na.rm = F) #linearly interpolate concentrations
+  DRKR.zeros.interpload[104951:nrow(DRKR.zeros.interpload),i]<-DRKR.zeros.dt[48,i-7]
+}
+DRKR.zeros.interpload$tot.conc<-rowSums(DRKR.zeros.interpload[,10:101])
+
+DRKR.zeros.interp.annual<-data.frame(matrix(ncol = 93, nrow = 1))
+names(DRKR.zeros.interp.annual)<-names(DRKR.zeros.interpload)[10:102]
+for (i in 1:ncol(DRKR.zeros.interp.annual)){
+  DRKR.zeros.interp.annual[1,i]<-sum(DRKR.zeros.interpload['Q_Ls']*DRKR.zeros.interpload[,i+9]*300/1e+09)
+}
+# mean(DRKR.zeros.interp.annual$Acetaminophen)*2   is the equivalent of acetaminophen tablets discharged (117)
+# DRKR.zeros.interp.annual$Acetaminophen = 58.5 g
+
+# mean(DRKR.zeros.interp.annual$Amytriptyline)*(1000/75)+mean(DRKR.zeros.interp.annual$Mianserin)*(1000/60)+mean(DRKR.zeros.interp.annual$Sertraline)*(1000/50)    is the equivalent of total antidepressants discharged (2682)
+# DRKR.zeros.interp.annual$Amytriptyline+DRKR.zeros.interp.annual$Mianserin+DRKR.zeros.interp.annual$Sertraline = 199.4 g
+
+# mean(DRKR.zeros.interp.annual$Cilazapril)*(1000/2.5)+mean(DRKR.zeros.interp.annual$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin agents doses discharged (3356)
+# DRKR.zeros.interp.annual$Cilazapril+DRKR.zeros.interp.annual$Irbesartan = 85.6 g 
+
+# mean(DRKR.zeros.interp.annual$Trimethoprim)*(1000/400)+mean(DRKR.zeros.interp.annual$Ciprofloxacin)+mean(DRKR.zeros.interp.annual$Norfloxacin)*(1000/800)+mean(DRKR.zeros.interp.annual$Ofloxacin)*(1000/400)   is the equivalent of total doses of total antibiotics discharged (200)
+# DRKR.zeros.interp.annual$Trimethoprim+DRKR.zeros.interp.annual$Ciprofloxacin+DRKR.zeros.interp.annual$Norfloxacin+DRKR.zeros.interp.annual$Ofloxacin = 100.0 g
+
+DRKR.halfdetect.dt<-left_join(DRKR.halfdetect,DRKR.datetime,by='date') #join the times to the conc
+DRKR.halfdetect.interpload<-left_join(DRKR.Q.seq,DRKR.halfdetect.dt,by=c('DateTime'='round.datetime'))
+for (i in 10:101){
+  DRKR.halfdetect.interpload[1:106,i]<-DRKR.halfdetect.interpload[107,i]
+  DRKR.halfdetect.interpload[,i]<-na.approx( DRKR.halfdetect.interpload[,i],na.rm = F) #linearly interpolate concentrations
+  DRKR.halfdetect.interpload[104951:nrow(DRKR.halfdetect.interpload),i]<-DRKR.halfdetect.dt[48,i-7]
+}
+DRKR.halfdetect.interpload$tot.conc<-rowSums(DRKR.halfdetect.interpload[,10:101])
+
+DRKR.halfdetect.interp.annual<-data.frame(matrix(ncol = 93, nrow = 1))
+names(DRKR.halfdetect.interp.annual)<-names(DRKR.halfdetect.interpload)[10:102]
+for (i in 1:ncol(DRKR.halfdetect.interp.annual)){
+  DRKR.halfdetect.interp.annual[1,i]<-sum(DRKR.halfdetect.interpload['Q_Ls']*DRKR.halfdetect.interpload[,i+9]*300/1e+09)
+}
+
+DRKR.interp<-rbind(DRKR.zeros.interp.annual,DRKR.halfdetect.interp.annual)
+DRKR.interp$method<-c("zeros","halfdetect")
+write.csv(DRKR.interp,"DRKR.interp.csv",row.names = F)
+
+# mean(DRKR.halfdetect.interp.annual$Acetaminophen)*2   is the equivalent of acetaminophen tablets discharged (526)
+# DRKR.halfdetect.interp.annual$Acetaminophen = 263.1 g
+
+# mean(DRKR.halfdetect.interp.annual$Amytriptyline)*(1000/75)+mean(DRKR.halfdetect.interp.annual$Mianserin)*(1000/60)+mean(DRKR.halfdetect.interp.annual$Sertraline)*(1000/50)    is the equivalent of total antidepressants discharged (5361)
+# DRKR.halfdetect.interp.annual$Amytriptyline+DRKR.halfdetect.interp.annual$Mianserin+DRKR.halfdetect.interp.annual$Sertraline = 359.5 g
+
+# mean(DRKR.halfdetect.interp.annual$Cilazapril)*(1000/2.5)+mean(DRKR.halfdetect.interp.annual$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin agents doses discharged (8292)
+# DRKR.halfdetect.interp.annual$Cilazapril+DRKR.halfdetect.interp.annual$Irbesartan = 118.0 g 
+
+# mean(DRKR.halfdetect.interp.annual$Trimethoprim)*(1000/400)+mean(DRKR.halfdetect.interp.annual$Ciprofloxacin)+mean(DRKR.halfdetect.interp.annual$Norfloxacin)*(1000/800)+mean(DRKR.halfdetect.interp.annual$Ofloxacin)*(1000/400)   is the equivalent of total doses of total antibiotics discharged (517)
+# DRKR.halfdetect.interp.annual$Trimethoprim+DRKR.halfdetect.interp.annual$Ciprofloxacin+DRKR.halfdetect.interp.annual$Norfloxacin+DRKR.halfdetect.interp.annual$Ofloxacin = 334.3 g
+
+#For the mixed approach, it matters which values end up where, so we'll use a resampling approach here:
+
+DRKR.mixed.list<-replicate(10000,DRKR.tidydrugs,simplify=F)
+ for (i in 1:length(DRKR.mixed.list)){
+  foo<-DRKR.mixed.list[[i]]
+  for (j in 3:ncol(DRKR.tidydrugs)){
+    foo[base::sample(which(is.na(foo[,j])),size=0.5*length(which(is.na(foo[,j])))),j]<-0
+    foo[,j]<-replace_na(foo[,j], DrugInfo[j-2,'LOQ']/2)
+  }
+  DRKR.mixed.list[[i]]<-left_join(foo,DRKR.datetime,by='date')
+}
+
+
+DRKR.mixed.interp.MC <- data.frame(matrix(ncol = 92, nrow = 10000))
+colnames(DRKR.mixed.interp.MC) <- colnames(DRKR.tidydrugs)[3:94]
+
+for (i in 1:length(DRKR.mixed.list)){
+  mango<-left_join(DRKR.Q.seq,DRKR.mixed.list[[i]],by=c('DateTime'='round.datetime'))
+   for (j in 1:92){
+      mango[1:106,j+9]<-mango[107,j+9]
+      mango[,j+9]<-na.approx(mango[,j+9],na.rm = F) #linearly interpolate concentrations
+      mango[104951:nrow(mango),j+9]<-mango[104950,j+9]  # now we have a dataframe for the interpolated concentrations of each drug over the Q timeseries, so we multiply each drug by Q and sum it to get annual flux, then and save each interaction in its own row of a dataframe
+      DRKR.mixed.interp.MC[i,j]<-sum(mango['Q_Ls']*mango[,j+9]*300/1e+09)
+     
+  }
+}  
+
+write.csv(DRKR.mixed.interp.MC,"DRKR.mixed_interpolation.BootstrapResults.csv",row.names = F)
+  
+# mean(DRKR.mixed.interp.MC$Acetaminophen)*2   is the equivalent of acetaminophen tablets discharged (327)
+# CI(DRKR.mixed.interp.MC$Acetaminophen,ci=0.95) = [162.9, 163.7], mean = 163.3 g
+
+# mean(DRKR.mixed.interp.MC$Amytriptyline)*(1000/75)+mean(DRKR.mixed.interp.MC$Mianserin)*(1000/60)+mean(DRKR.mixed.interp.MC$Sertraline)*(1000/50)    is the equivalent of total antidepressants discharged (4035)
+# CI(DRKR.mixed.interp.MC$Amytriptyline+DRKR.mixed.interp.MC$Mianserin+DRKR.mixed.interp.MC$Sertraline,ci=0.95) = [280.25, 280.65], mean = 280.5 g
+
+# mean(DRKR.mixed.interp.MC$Cilazapril)*(1000/2.5)+mean(DRKR.mixed.interp.MC$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin agents doses discharged (5881)
+# CI(DRKR.mixed.interp.MC$Cilazapril+DRKR.mixed.interp.MC$Irbesartan,ci=0.95) = [102.1, 102.2], mean = 102.1 g 
+
+# mean(DRKR.mixed.interp.MC$Trimethoprim)*(1000/400)+mean(DRKR.mixed.interp.MC$Ciprofloxacin)+mean(DRKR.mixed.interp.MC$Norfloxacin)*(1000/800)+mean(DRKR.mixed.interp.MC$Ofloxacin)*(1000/400)   is the equivalent of total doses of total antibiotics discharged (360)
+# CI(DRKR.mixed.interp.MC$Trimethoprim+DRKR.mixed.interp.MC$Ciprofloxacin+DRKR.mixed.interp.MC$Norfloxacin+DRKR.mixed.interp.MC$Ofloxacin,ci=0.95) = [217.5, 218.1], mean = 217.8 g
+
+```
+
+
+
+```{r Load estimates at Gwynnbrook}
+
+#use chemistry sampling time stamps to estimate time for pharma sampling
+chem.data<-read.csv(file="bes.waterchem.clean.csv", header=T)
+chem.data$Date<-dmy(chem.data$Date)
+chem.data$Site<-as.character(chem.data$Site)
+pharma.sampletimes<-subset(chem.data, Date>=ymd("171102") & Date <=ymd("181115"))[c("Date","time","Site")]
+
+#join the sample times to the drug data and subset for Carroll Park
+pharma.GFGB<-subset(right_join(pharma.sampletimes,tidy.drugdata,by=c("Date"="date","Site"="site")),Site=="GFGB")[-35,]
+pharma.GFGB$time[which(as.character(pharma.GFGB$time)=="2.04")]<-NA
+
+#calculate an "average sampling time" to estimate the dates without recorded sampling time (n=3).
+samp.times<-matrix(unlist(strsplit(as.character(pharma.GFGB$time[which(!is.na(pharma.GFGB$time))]),":")), ncol=2, byrow=TRUE)
+mean(as.numeric(samp.times[,1])*60+as.numeric(samp.times[,2]))/60 #10.22754
+0.22754*60 #14 mins
+#average sampling time is 10:14 am, replace the NAs
+pharma.GFGB$time[which(is.na(pharma.GFGB$time))]<-"10:14"
+
+### using Q measurements within 30 min on either side of sample time, estimate instantaneous flow as the mean in this window (and also record the sd and N_Obs in the window)
+GFGB.datetime<-ymd_hm(paste(pharma.GFGB$Date,pharma.GFGB$time))
+GFGB.sample.Q<-list() #For each sample time, extract the Q in the window
+for (i in 1:length(GFGB.datetime)){
+  GFGB.sample.Q[[i]]<-subset(GFGB.instaflow,ymd_hms(DateTime)>=GFGB.datetime[i]-30*60&ymd_hms(DateTime)<=GFGB.datetime[i]+30*60)
+}
+# Calculate mean flow in the window
+GFGB.pharma.Q<-data.frame(Date=pharma.GFGB$Date,time=pharma.GFGB$time,Q.Ls.mean=rep(NA,times=length(pharma.GFGB$time)),Q.Ls.sd=rep(NA,times=length(pharma.GFGB$time)),Q.Ls.n=rep(NA,times=length(pharma.GFGB$time)))
+for (i in 1:nrow(GFGB.pharma.Q)){
+ GFGB.pharma.Q$Q.Ls.mean[i]<-mean(GFGB.sample.Q[[i]]$Q_Ls) 
+ GFGB.pharma.Q$Q.Ls.sd[i]<-sd(GFGB.sample.Q[[i]]$Q_Ls) 
+ GFGB.pharma.Q$Q.Ls.n[i]<-length(GFGB.sample.Q[[i]]$Q_Ls) 
+}
+
+GFGB.load<-full_join(GFGB.pharma.Q,pharma.GFGB,by=c("Date"="Date","time"="time"))
+
+#plot the C-Q relationship for total.conc
+png("Figures/GFGB.totalconc.vs.Q.png",height=12,width=12,units='cm',res=300)
+par(mar = c(3,3,0.8,0.5))
+par(mgp=c(1.3,0.2,0))
+plot(GFGB.load$tot.conc+1~GFGB.load$Q.Ls.mean,log="xy",xlab=expression(paste("Q (Ls"^-1,")")),ylab=expression(paste("sum concentration+1 (ng L"^-1,")")),pch=16,axes=F)
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+dev.off()
+
+
+### Load estimates for GFGB!
+GFGB.sub.names<-colnames(GFGB.load)[colSums(!is.na(GFGB.load)) > 0] #which drugs are detected at GFGB
+GFGB.subset<-GFGB.load[names(GFGB.load) %in% GFGB.sub.names]
+
+#first, calculate and plot timeseries
+GFGB.color<-left_join(data.frame(Names=GFGB.sub.names[7:20],Class=DrugInfo[DrugInfo$Name %in% GFGB.sub.names,]$Class),data.frame(Class=unique(DrugInfo[DrugInfo$Name %in% GFGB.sub.names,]$Class),color=c("#8dd3c7",
+"#ffffb3",
+"#bebada",
+"#fb8072",
+"#80b1d3",
+"#fdb462",
+"#b3de69",
+"#fccde5")))
+
+
+png("Figures/GFGB.totalload.timeseries.png",height=10,width=15,units='cm',res=300)
+par(mar = c(3,3,0.8,0.5))
+par(mgp=c(1.3,0.2,0))
+plot((GFGB.load$tot.conc*GFGB.load$Q.Ls.mean)*3600/1E+09~ymd(GFGB.load$Date),xlab="",ylab=expression(paste("load (g h"^-1,")")),type="n",axes=F)
+for (i in 1:length(GFGB.sub.names[7:22])){
+points((GFGB.load[,which(colnames(GFGB.load)==GFGB.sub.names[i+6])]*GFGB.load$Q.Ls.mean)*3600/1e+09~ymd(GFGB.load$Date),col=as.character(GFGB.color$color[which(GFGB.color$Names==GFGB.sub.names[i+6])]),pch=16)  
+}
+points((GFGB.load$tot.conc*GFGB.load$Q.Ls.mean)*3600/1E+09~ymd(GFGB.load$Date),pch=0,lwd=2)
+axis(1,tck=0.02, cex.axis=0.8,at=ymd(c("2017-11-01","2018-01-01","2018-03-01","2018-05-01","2018-07-01","2018-09-01","2018-11-01")),labels=c("Nov17","Jan18","Mar18","May18","Jul18","Sep18","Nov18")) 
+axis(2,tck=0.02,cex.axis=0.8)
+box()
+legend('topleft',c(as.character(unique(GFGB.color$Class)),"TOTAL"),col = c(as.character(unique(GFGB.color$color)),"black"),pch=c(rep(16,times=10),0),pt.lwd = c(rep(0,times=10),2),cex=0.75,bty="n")
+                                                                                                                    
+dev.off()
+
+#######################
+### Q interpolation ###
+#######################
+
+GFGB.Q<-subset(GFGB.instaflow,DateTime>=ymd_hms("2017-11-02 00:00:00") & DateTime<ymd_hms("2018-11-02 00:00:00"))
+fiveminseq<-data.frame(DateTime=seq(from=ymd_hms("2017-11-02 00:00:00"), to = ymd_hms("2018-11-01 23:55:00"),by='5 min')) # create a full time series for the year of discharge
+GFGB.Q.seq<-left_join(fiveminseq,GFGB.Q) # join the USGS Q to the full timeseries
+GFGB.Q.seq$Q_Ls<-na.approx(GFGB.Q.seq$Q_Ls,na.rm = F) # linearly interpolate missing Q values
+GFGB.Q.seq$Q_Ls[105119:105120]<-GFGB.Q.seq$Q_Ls[105118]
+
+#######################
+### Median approach ###
+#######################
+
+#Extrapolating median concentrations: 
+GFGB.tot.conc.med<-median(GFGB.load$tot.conc)
+GFGB.tot.conc.mean<-mean(GFGB.load$tot.conc)
+GFGB.tot.load.med<-sum(GFGB.Q.seq$Q_Ls*GFGB.tot.conc.med*300)/1e+09
+GFGB.tot.load.mean<-sum(GFGB.Q.seq$Q_Ls*GFGB.tot.conc.mean*300)/1e+09
+#Q measurements are every 5 mins; we estimate a total of 28.5 g (median) to 831.2 g (mean) pharmaceuticals total are discharged through this stream reach
+
+GFGB.antidepressant<-data.frame(amyt=GFGB.load$Amytriptyline,mian=GFGB.load$Mianserin,dulox=GFGB.load$Duloxetine)
+GFGB.antidepressant[is.na(GFGB.antidepressant)]<-0
+mean.antidepressant.prop<-with(subset(data.frame(antidepressant=rowSums(GFGB.antidepressant),tot=GFGB.load$tot.conc),tot>0),mean(antidepressant/tot)) 
+GFGB.tot.load.med*mean.antidepressant.prop
+GFGB.tot.load.mean*mean.antidepressant.prop
+#on average, 12.4% of the total load at Gwynnbrook is antidepressants, meaning that the watershed is contributing  3.54 g (median) to 103.4 g (mean) of antidepressants annually
+
+GFGB.antibiotic<-data.frame(clar=GFGB.load$Clarithromycin,oflox=GFGB.load$Ofloxacin,trimeth=GFGB.load$Trimethoprim)
+GFGB.antibiotic[is.na(GFGB.antibiotic)]<-0
+mean.antibiotic.prop<-with(subset(data.frame(antibiotic=rowSums(GFGB.antibiotic),tot=GFGB.load$tot.conc),tot>0),mean(antibiotic/tot)) 
+GFGB.tot.load.med*mean.antibiotic.prop
+GFGB.tot.load.mean*mean.antibiotic.prop
+#on average, 66.6% of the total load at Gwynnbrook is antibiotics, meaning that the watershed is contributing 18.97 g (median) to 553.7 g (mean) of antibiotics annually, the equivalent of 2665 daily doses
+
+#####################################
+### SET UP DIFFERENT "APPROACHES" ###
+#####################################
+
+## create three versions of the GFGB drug data: all NAs filled with zeros, all NAs filled with 0.5 detection limit, and a 50-50 mix of the two:
+GFGB.tidydrugs<-subset(tidy.drugdata,site=="GFGB")
+GFGB.zeros<-GFGB.tidydrugs
+GFGB.zeros[is.na(GFGB.zeros)] = 0
+GFGB.zeros$tot.conc<-rowSums(GFGB.zeros[,3:94],na.rm = T)
+
+GFGB.halfdetect<-GFGB.tidydrugs
+for (i in 3:ncol(GFGB.halfdetect)){
+  GFGB.halfdetect[,i]<-replace_na(GFGB.halfdetect[,i], DrugInfo[i-2,'LOQ']/2)
+}
+GFGB.halfdetect$tot.conc<-rowSums(GFGB.halfdetect[,3:94],na.rm = T)
+
+GFGB.mixed<-GFGB.tidydrugs
+for (i in 3:ncol(GFGB.mixed)){
+  GFGB.mixed[base::sample(which(is.na(GFGB.mixed[,i])),size=0.5*length(which(is.na(GFGB.mixed[,i])))),i]<-0
+    
+  GFGB.mixed[,i]<-replace_na(GFGB.mixed[,i], DrugInfo[i-2,'LOQ']/2)
+}
+GFGB.mixed$tot.conc<-rowSums(GFGB.mixed[,3:94],na.rm = T)
+
+
+
+#############################
+### Resampling approaches ###
+#############################
+
+# re-sample from each of these types for each drug and apply them to the discharge time-series
+
+#Set up the function "estimate load", which takes the inputs "site.type.drug" (a vector) specifying which site, the type of estimation for BDL data, and which drug (e.g. "GFGB.zeros$tot.conc") and the site-specific, gap-filled Q timeseries (a vector, e.g. "GFGB.Q.seq")
+estimate.load<- function(site.type.drug,Q.seq){ 
+  sample<-base::sample(site.type.drug,size = nrow(Q.seq),replace = T) # this part randomly samples from the concentrations, with replacement, and applies them to the discharge timeseries
+  tot.load<-sum(sample*Q.seq$Q_Ls*300)/1e+09 # this part multiplies concentration by discharge and sums over the discharge time series to give a total load in grams
+  return(tot.load)
+}
+
+### NOW, apply a bootstrap, and repeat it for each drug and each type of estimation
+
+runs<-10000
+
+cl <- makeCluster(3)
+registerDoParallel(cl)  # initiate the cluster to run in parallel
+
+#GFGB.zeros.MC<-list()
+#for (i in 3:ncol(GFGB.zeros)){
+#  GFGB.zeros.MC[[i-2]]<-replicate(runs,estimate.load(GFGB.zeros[,i],GFGB.Q.seq))
+#}
+#names(GFGB.zeros.MC)<-colnames(GFGB.zeros)[3:ncol(GFGB.zeros)]
+
+GFGB.zeros.MC <- foreach(i=3:ncol(GFGB.zeros), .combine = "cbind.data.frame") %dopar% { 
+  replicate(runs,estimate.load(GFGB.zeros[,i],GFGB.Q.seq))
+}
+names(GFGB.zeros.MC)<-colnames(GFGB.zeros)[3:ncol(GFGB.zeros)]
+# write.csv(GFGB.zeros.MC,'GFGB.bootstrappedfluxes.zeros.csv',row.names = F)
+
+# mean(GFGB.zeros.MC$Amytriptyline)*(1000/75)+mean(GFGB.zeros.MC$Mianserin)*(1000/60)+mean(GFGB.zeros.MC$Duloxetine)*(1000/60)    is the equivalent of total antidepressants discharged (4581)
+# CI((GFGB.zeros.MC$Amytriptyline+GFGB.zeros.MC$Mianserin+GFGB.zeros.MC$Duloxetine),ci=0.95) = [340.9, 342.0], mean = 341.5 g
+
+# mean(GFGB.zeros.MC$Ofloxacin)*(1000/400)+mean(GFGB.zeros.MC$Trimethoprim)*(1000/400)+mean(GFGB.zeros.MC$Clarithromycin)    is the equivalent of total antibiotics discharged (282)
+# CI((GFGB.zeros.MC$Ofloxacin+GFGB.zeros.MC$Trimethoprim+GFGB.zeros.MC$Clarithromycin),ci=0.95) = [139.1, 139.5], mean = 139.3 g
+
+# mean(GFGB.zeros.MC$Cilazapril)*(1000/2.5)+mean(GFGB.zeros.MC$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin drugs discharged (1520)
+# CI((GFGB.zeros.MC$Cilazapril+GFGB.zeros.MC$Irbesartan),ci=0.95) = [96.5, 96.8], mean = 96.7 g
+
+GFGB.halfdetect.MC <- foreach(i=3:ncol(GFGB.halfdetect), .combine = "cbind.data.frame") %dopar% { 
+  replicate(runs,estimate.load(GFGB.halfdetect[,i],GFGB.Q.seq))
+}
+names(GFGB.halfdetect.MC)<-colnames(GFGB.halfdetect)[3:ncol(GFGB.halfdetect)]
+# write.csv(GFGB.halfdetect.MC,'GFGB.bootstrappedfluxes.halfdetect.csv',row.names = F)
+
+# mean(GFGB.halfdetect.MC$Amytriptyline)*(1000/75)+mean(GFGB.halfdetect.MC$Mianserin)*(1000/60)+mean(GFGB.halfdetect.MC$Duloxetine)*(1000/60)    is the equivalent of total antidepressants discharged (5288)
+# CI((GFGB.halfdetect.MC$Amytriptyline+GFGB.halfdetect.MC$Mianserin+GFGB.halfdetect.MC$Duloxetine),ci=0.95) = [389.8, 390.9], mean = 390.4 g
+
+# mean(GFGB.halfdetect.MC$Ofloxacin)*(1000/400)+mean(GFGB.halfdetect.MC$Trimethoprim)*(1000/400)+mean(GFGB.halfdetect.MC$Clarithromycin)    is the equivalent of total antibiotics discharged (330.3)
+# CI((GFGB.halfdetect.MC$Ofloxacin+GFGB.halfdetect.MC$Trimethoprim+GFGB.halfdetect.MC$Clarithromycin),ci=0.95) = [164.6, 165.0], mean = 164.8 g
+
+# mean(GFGB.halfdetect.MC$Cilazapril)*(1000/2.5)+mean(GFGB.halfdetect.MC$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin drugs discharged (4139)
+# CI((GFGB.halfdetect.MC$Cilazapril+GFGB.halfdetect.MC$Irbesartan),ci=0.95) = [113.2, 113.5], mean = 113.3 g
+
+
+
+GFGB.mixed.MC <- foreach(i=3:ncol(GFGB.mixed), .combine = "cbind.data.frame") %dopar% { 
+  replicate(runs,estimate.load(GFGB.mixed[,i],GFGB.Q.seq))
+}
+names(GFGB.mixed.MC)<-colnames(GFGB.mixed)[3:ncol(GFGB.mixed)]
+# write.csv(GFGB.mixed.MC,'GFGB.bootstrappedfluxes.mixed.csv',row.names = F)
+
+# mean(GFGB.mixed.MC$Amytriptyline)*(1000/75)+mean(GFGB.mixed.MC$Mianserin)*(1000/60)+mean(GFGB.mixed.MC$Duloxetine)*(1000/60)    is the equivalent of total antidepressants discharged (4935)
+# CI((GFGB.mixed.MC$Amytriptyline+GFGB.mixed.MC$Mianserin+GFGB.mixed.MC$Duloxetine),ci=0.95) = [365.4, 366.5], mean = 366.0 g
+
+# mean(GFGB.mixed.MC$Ofloxacin)*(1000/400)+mean(GFGB.mixed.MC$Trimethoprim)*(1000/400)+mean(GFGB.mixed.MC$Clarithromycin)    is the equivalent of total antibiotics discharged (307)
+# CI((GFGB.mixed.MC$Ofloxacin+GFGB.mixed.MC$Trimethoprim+GFGB.mixed.MC$Clarithromycin),ci=0.95) = [152.3, 152.7], mean = 152.5 g
+
+# mean(GFGB.mixed.MC$Cilazapril)*(1000/2.5)+mean(GFGB.mixed.MC$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin drugs discharged (2860)
+# CI((GFGB.mixed.MC$Cilazapril+GFGB.mixed.MC$Irbesartan),ci=0.95) = [105.0, 105.3], mean = 105.2 g
+
+#stopCluster(cl)
+
+#############################################
+### Interpolated concentration approaches ###
+#############################################
+
+GFGB.datetime<-data.frame(date=as_date(GFGB.datetime),datetime=GFGB.datetime,round.datetime=ymd_hms(round_date(GFGB.datetime,unit="5 mins"))) # make the datetime round to match with the Q timeseries
+GFGB.Q.seq$DateTime<-ymd_hms(GFGB.Q.seq$DateTime)
+
+
+GFGB.zeros.dt<-left_join(GFGB.zeros,GFGB.datetime,by='date') #join the times to the conc
+GFGB.zeros.interpload<-left_join(GFGB.Q.seq,GFGB.zeros.dt,by=c('DateTime'='round.datetime'))
+for (i in 10:101){
+  GFGB.zeros.interpload[1:122,i]<-GFGB.zeros.interpload[123,i]
+  GFGB.zeros.interpload[,i]<-na.approx( GFGB.zeros.interpload[,i],na.rm = F) #linearly interpolate concentrations
+  GFGB.zeros.interpload[104950:nrow(GFGB.zeros.interpload),i]<-GFGB.zeros.dt[47,i-7]
+}
+GFGB.zeros.interpload$tot.conc<-rowSums(GFGB.zeros.interpload[,10:101])
+
+GFGB.zeros.interp.annual<-data.frame(matrix(ncol = 93, nrow = 1))
+names(GFGB.zeros.interp.annual)<-names(GFGB.zeros.interpload)[10:102]
+for (i in 1:ncol(GFGB.zeros.interp.annual)){
+  GFGB.zeros.interp.annual[1,i]<-sum(GFGB.zeros.interpload['Q_Ls']*GFGB.zeros.interpload[,i+9]*300/1e+09)
+}
+
+# mean(GFGB.zeros.interp.annual$Amytriptyline)*(1000/75)+mean(GFGB.zeros.interp.annual$Mianserin)*(1000/60)+mean(GFGB.zeros.interp.annual$Duloxetine)*(1000/60)    is the equivalent of total antidepressants discharged (7290)
+# GFGB.zeros.interp.annual$Amytriptyline+GFGB.zeros.interp.annual$Mianserin+GFGB.zeros.interp.annual$Duloxetine = 545.4 g
+
+# mean(GFGB.zeros.interp.annual$Ofloxacin)*(1000/400)+mean(GFGB.zeros.interp.annual$Trimethoprim)*(1000/400)+mean(GFGB.zeros.interp.annual$Clarithromycin)    is the equivalent of total antibiotics discharged (85.3)
+# GFGB.zeros.interp.annual$Ofloxacin+GFGB.zeros.interp.annual$Trimethoprim+GFGB.zeros.interp.annual$Clarithromycin = 50.4 g
+
+# mean(GFGB.zeros.interp.annual$Cilazapril)*(1000/2.5)+mean(GFGB.zeros.interp.annual$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin drugs discharged (1172)
+# GFGB.zeros.interp.annual$Cilazapril+GFGB.zeros.interp.annual$Irbesartan = 61.9 g
+
+GFGB.halfdetect.dt<-left_join(GFGB.halfdetect,GFGB.datetime,by='date') #join the times to the conc
+GFGB.halfdetect.interpload<-left_join(GFGB.Q.seq,GFGB.halfdetect.dt,by=c('DateTime'='round.datetime'))
+for (i in 10:101){
+  GFGB.halfdetect.interpload[1:122,i]<-GFGB.halfdetect.interpload[123,i]
+  GFGB.halfdetect.interpload[,i]<-na.approx( GFGB.halfdetect.interpload[,i],na.rm = F) #linearly interpolate concentrations
+  GFGB.halfdetect.interpload[104950:nrow(GFGB.halfdetect.interpload),i]<-GFGB.halfdetect.dt[47,i-7]
+}
+GFGB.halfdetect.interpload$tot.conc<-rowSums(GFGB.halfdetect.interpload[,10:101])
+
+GFGB.halfdetect.interp.annual<-data.frame(matrix(ncol = 93, nrow = 1))
+names(GFGB.halfdetect.interp.annual)<-names(GFGB.halfdetect.interpload)[10:102]
+for (i in 1:ncol(GFGB.halfdetect.interp.annual)){
+  GFGB.halfdetect.interp.annual[1,i]<-sum(GFGB.halfdetect.interpload['Q_Ls']*GFGB.halfdetect.interpload[,i+9]*300/1e+09)
+}
+
+GFGB.interp<-rbind(GFGB.zeros.interp.annual,GFGB.halfdetect.interp.annual)
+GFGB.interp$method<-c("zeros","halfdetect")
+write.csv(GFGB.interp,"GFGB.interp.csv",row.names = F)
+
+
+# mean(GFGB.halfdetect.interp.annual$Amytriptyline)*(1000/75)+mean(GFGB.halfdetect.interp.annual$Mianserin)*(1000/60)+mean(GFGB.halfdetect.interp.annual$Duloxetine)*(1000/60)    is the equivalent of total antidepressants discharged (8013)
+# GFGB.halfdetect.interp.annual$Amytriptyline+GFGB.halfdetect.interp.annual$Mianserin+GFGB.halfdetect.interp.annual$Duloxetine = 595.5 g
+
+# mean(GFGB.halfdetect.interp.annual$Ofloxacin)*(1000/400)+mean(GFGB.halfdetect.interp.annual$Trimethoprim)*(1000/400)+mean(GFGB.halfdetect.interp.annual$Clarithromycin)    is the equivalent of total antibiotics discharged (136)
+# GFGB.halfdetect.interp.annual$Ofloxacin+GFGB.halfdetect.interp.annual$Trimethoprim+GFGB.halfdetect.interp.annual$Clarithromycin = 77.11 g
+
+# mean(GFGB.halfdetect.interp.annual$Cilazapril)*(1000/2.5)+mean(GFGB.halfdetect.interp.annual$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin drugs discharged (3823)
+# GFGB.halfdetect.interp.annual$Cilazapril+GFGB.halfdetect.interp.annual$Irbesartan = 78.78 g
+
+
+### For the mixed approach, it matters which values end up where, so we'll use a resampling approach here:
+
+GFGB.mixed.list<-replicate(10000,GFGB.tidydrugs,simplify=F)
+ for (i in 1:length(GFGB.mixed.list)){
+  foo<-GFGB.mixed.list[[i]]
+  for (j in 3:ncol(GFGB.tidydrugs)){
+    foo[base::sample(which(is.na(foo[,j])),size=0.5*length(which(is.na(foo[,j])))),j]<-0
+    foo[,j]<-replace_na(foo[,j], DrugInfo[j-2,'LOQ']/2)
+  }
+  GFGB.mixed.list[[i]]<-left_join(foo,GFGB.datetime,by='date')
+}
+
+
+GFGB.mixed.interp.MC <- data.frame(matrix(ncol = 92, nrow = 10000))
+colnames(GFGB.mixed.interp.MC) <- colnames(GFGB.tidydrugs)[3:94]
+
+for (i in 1:length(GFGB.mixed.list)){
+  mango<-left_join(GFGB.Q.seq,GFGB.mixed.list[[i]],by=c('DateTime'='round.datetime'))
+   for (j in 1:92){
+      mango[1:122,j+9]<-mango[123,j+9]
+      mango[,j+9]<-na.approx(mango[,j+9],na.rm = F) #linearly interpolate concentrations
+      mango[104950:nrow(mango),j+9]<-mango[104949,j+9]  # now we have a dataframe for the interpolated concentrations of each drug over the Q timeseries, so we multiply each drug by Q and sum it to get annual flux, then and save each interaction in its own row of a dataframe
+      GFGB.mixed.interp.MC[i,j]<-sum(mango['Q_Ls']*mango[,j+9]*300/1e+09)
+     
+  }
+}  
+write.csv(GFGB.mixed.interp.MC,"GFGB.mixed_interpolation.BootstrapResults.csv",row.names = F)
+  
+# mean(GFGB.mixed.interp.MC$Amytriptyline)*(1000/75)+mean(GFGB.mixed.interp.MC$Mianserin)*(1000/60)+mean(GFGB.mixed.interp.MC$Duloxetine)*(1000/60)    is the equivalent of total antidepressants discharged (7651)
+# CI(GFGB.mixed.interp.MC$Amytriptyline+GFGB.mixed.interp.MC$Mianserin+GFGB.mixed.interp.MC$Duloxetine,ci=0.95) = [570.4, 570.5], mean = 570.4 g
+
+# mean(GFGB.mixed.interp.MC$Ofloxacin)*(1000/400)+mean(GFGB.mixed.interp.MC$Trimethoprim)*(1000/400)+mean(GFGB.mixed.interp.MC$Clarithromycin)    is the equivalent of total antibiotics discharged (112)
+# CI(GFGB.mixed.interp.MC$Ofloxacin+GFGB.mixed.interp.MC$Trimethoprim+GFGB.mixed.interp.MC$Clarithromycin,ci=0.95) = [64.00, 64.08], mean = 64.04 g
+
+# mean(GFGB.mixed.interp.MC$Cilazapril)*(1000/2.5)+mean(GFGB.mixed.interp.MC$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin drugs discharged (2530)
+# CI(GFGB.mixed.interp.MC$Cilazapril+GFGB.mixed.interp.MC$Irbesartan,ci=0.95) = [70.42, 70.47], mean = 70.44 g
+
+```
+
+
+```{r Load estimates at Pond Branch}
+
+#use chemistry sampling time stamps to estimate time for pharma sampling
+chem.data<-read.csv(file="bes.waterchem.clean.csv", header=T)
+chem.data$Date<-dmy(chem.data$Date)
+chem.data$Site<-as.character(chem.data$Site)
+pharma.sampletimes<-subset(chem.data, Date>=ymd("171102") & Date <=ymd("181115"))[c("Date","time","Site")]
+
+#join the sample times to the drug data and subset for Carroll Park
+pharma.POBR<-subset(right_join(pharma.sampletimes,tidy.drugdata,by=c("Date"="date","Site"="site")),Site=="POBR")[-35,]
+pharma.POBR$time[which(as.character(pharma.POBR$time)=="2.04")]<-NA
+
+#calculate an "average sampling time" to estimate the dates without recorded sampling time (n=3).
+samp.times<-matrix(unlist(strsplit(as.character(pharma.POBR$time[which(!is.na(pharma.POBR$time))]),":")), ncol=2, byrow=TRUE)
+mean(as.numeric(samp.times[,1])*60+as.numeric(samp.times[,2]))/60 #11.33415
+0.33415*60 #20 mins
+#average sampling time is 10:14 am, replace the NAs
+pharma.POBR$time[which(is.na(pharma.POBR$time))]<-"11:20"
+
+### using Q measurements within 30 min on either side of sample time, estimate instantaneous flow as the mean in this window (and also record the sd and N_Obs in the window)
+POBR.datetime<-ymd_hm(paste(pharma.POBR$Date,pharma.POBR$time))
+POBR.sample.Q<-list() #For each sample time, extract the Q in the window
+for (i in 1:length(POBR.datetime)){
+  POBR.sample.Q[[i]]<-subset(POBR.instaflow,ymd_hms(DateTime)>=POBR.datetime[i]-30*60&ymd_hms(DateTime)<=POBR.datetime[i]+30*60)
+}
+# Calculate mean flow in the window
+POBR.pharma.Q<-data.frame(Date=pharma.POBR$Date,time=pharma.POBR$time,Q.Ls.mean=rep(NA,times=length(pharma.POBR$time)),Q.Ls.sd=rep(NA,times=length(pharma.POBR$time)),Q.Ls.n=rep(NA,times=length(pharma.POBR$time)))
+for (i in 1:nrow(POBR.pharma.Q)){
+ POBR.pharma.Q$Q.Ls.mean[i]<-mean(POBR.sample.Q[[i]]$Q_Ls) 
+ POBR.pharma.Q$Q.Ls.sd[i]<-sd(POBR.sample.Q[[i]]$Q_Ls) 
+ POBR.pharma.Q$Q.Ls.n[i]<-length(POBR.sample.Q[[i]]$Q_Ls) 
+}
+
+POBR.load<-full_join(POBR.pharma.Q,pharma.POBR,by=c("Date"="Date","time"="time"))
+
+#plot the C-Q relationship for total.conc
+png("Figures/POBR.totalconc.vs.Q.png",height=12,width=12,units='cm',res=300)
+par(mar = c(3,3,0.8,0.5))
+par(mgp=c(1.3,0.2,0))
+plot(POBR.load$tot.conc+1~POBR.load$Q.Ls.mean,log="xy",xlab=expression(paste("Q (Ls"^-1,")")),ylab=expression(paste("sum concentration+1 (ng L"^-1,")")),pch=16,axes=F)
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+dev.off()
+
+
+### Load estimates for POBR!
+POBR.sub.names<-colnames(POBR.load)[colSums(!is.na(POBR.load)) > 0] #which drugs are detected at POBR
+POBR.subset<-POBR.load[names(POBR.load) %in% POBR.sub.names]
+
+#first, calculate and plot timeseries
+POBR.color<-left_join(data.frame(Names=POBR.sub.names[7:15],Class=DrugInfo[DrugInfo$Name %in% POBR.sub.names,]$Class),data.frame(Class=unique(DrugInfo[DrugInfo$Name %in% POBR.sub.names,]$Class),color=c("#8dd3c7",
+"#ffffb3",
+"#bebada",
+"#fb8072")))
+
+
+png("Figures/POBR.totalload.timeseries.png",height=10,width=15,units='cm',res=300)
+par(mar = c(3,3,0.8,0.5))
+par(mgp=c(1.3,0.2,0))
+plot((POBR.load$tot.conc*POBR.load$Q.Ls.mean)*3600/1E+09~ymd(POBR.load$Date),xlab="",ylab=expression(paste("load (g h"^-1,")")),type="n",axes=F)
+for (i in 1:length(POBR.sub.names[7:15])){
+points((POBR.load[,which(colnames(POBR.load)==POBR.sub.names[i+6])]*POBR.load$Q.Ls.mean)*3600/1e+09~ymd(POBR.load$Date),col=as.character(POBR.color$color[which(POBR.color$Names==POBR.sub.names[i+6])]),pch=16)  
+}
+points((POBR.load$tot.conc*POBR.load$Q.Ls.mean)*3600/1E+09~ymd(POBR.load$Date),pch=0,lwd=2)
+axis(1,tck=0.02, cex.axis=0.8,at=ymd(c("2017-11-01","2018-01-01","2018-03-01","2018-05-01","2018-07-01","2018-09-01","2018-11-01")),labels=c("Nov17","Jan18","Mar18","May18","Jul18","Sep18","Nov18")) 
+axis(2,tck=0.02,cex.axis=0.8)
+box()
+legend('topright',c(as.character(unique(POBR.color$Class)),"TOTAL"),col = c(as.character(unique(POBR.color$color)),"black"),pch=c(rep(16,times=10),0),pt.lwd = c(rep(0,times=10),2),cex=0.75)
+                                                                                                                
+dev.off()
+
+#######################
+### Q interpolation ###
+#######################
+
+POBR.Q<-subset(POBR.instaflow,DateTime>=ymd_hms("2017-11-02 00:00:00") & DateTime<ymd_hms("2018-11-02 00:00:00"))
+fiveminseq<-data.frame(DateTime=seq(from=ymd_hms("2017-11-02 00:00:00"), to = ymd_hms("2018-11-01 23:55:00"),by='5 min')) # create a full time series for the year of discharge
+POBR.Q.seq<-left_join(fiveminseq,POBR.Q) # join the USGS Q to the full timeseries
+POBR.Q.seq$Q_Ls<-na.approx(POBR.Q.seq$Q_Ls,na.rm = F) # linearly interpolate missing Q values
+POBR.Q.seq$Q_Ls[105119:105120]<-POBR.Q.seq$Q_Ls[105118]
+
+#######################
+### Median approach ###
+#######################
+
+#Extrapolating median concentrations: 
+POBR.tot.conc.med<-median(POBR.load$tot.conc) # 0 g
+POBR.tot.conc.mean<-mean(POBR.load$tot.conc) # 17.65 g
+POBR.tot.load.med<-sum(POBR.Q.seq$Q_Ls*POBR.tot.conc.med*300)/1e+09
+POBR.tot.load.mean<-sum(POBR.Q.seq$Q_Ls*POBR.tot.conc.mean*300)/1e+09
+#Q measurements are every 5 mins; we estimate a total of 0 g (median) to 2.01 g (mean) pharmaceuticals total are discharged through this stream reach
+
+POBR.antidepressant<-data.frame(amyt=POBR.load$Amytriptyline,mian=POBR.load$Mianserin,dulox=POBR.load$Duloxetine)
+POBR.antidepressant[is.na(POBR.antidepressant)]<-0
+mean.antidepressant.prop<-with(subset(data.frame(antidepressant=rowSums(POBR.antidepressant),tot=POBR.load$tot.conc),tot>0),mean(antidepressant/tot)) 
+POBR.tot.load.med*mean.antidepressant.prop
+POBR.tot.load.mean*mean.antidepressant.prop
+#on average, 35.44% of the total load at Pond Branch is antidepressants, meaning that the watershed is contributing  0 g (median) to 0.714 g (mean) of antidepressants annually
+
+POBR.antibiotic<-data.frame(clar=POBR.load$Clarithromycin,oflox=POBR.load$Ofloxacin,trimeth=POBR.load$Trimethoprim)
+POBR.antibiotic[is.na(POBR.antibiotic)]<-0
+mean.antibiotic.prop<-with(subset(data.frame(antibiotic=rowSums(POBR.antibiotic),tot=POBR.load$tot.conc),tot>0),mean(antibiotic/tot)) 
+POBR.tot.load.med*mean.antibiotic.prop
+POBR.tot.load.mean*mean.antibiotic.prop
+#on average, 38.4% of the total load at Pond Branch is antibiotics, meaning that the watershed is contributing 0 g (median) to 0.7734 g (mean) of antibiotics annually, the equivalent of 2665 daily doses
+
+#####################################
+### SET UP DIFFERENT "APPROACHES" ###
+#####################################
+
+## create three versions of the POBR drug data: all NAs filled with zeros, all NAs filled with 0.5 detection limit, and a 50-50 mix of the two:
+POBR.tidydrugs<-subset(tidy.drugdata,site=="POBR")
+POBR.zeros<-POBR.tidydrugs
+POBR.zeros[is.na(POBR.zeros)] = 0
+POBR.zeros$tot.conc<-rowSums(POBR.zeros[,3:94],na.rm = T)
+
+POBR.halfdetect<-POBR.tidydrugs
+for (i in 3:ncol(POBR.halfdetect)){
+  POBR.halfdetect[,i]<-replace_na(POBR.halfdetect[,i], DrugInfo[i-2,'LOQ']/2)
+}
+POBR.halfdetect$tot.conc<-rowSums(POBR.halfdetect[,3:94],na.rm = T)
+
+POBR.mixed<-POBR.tidydrugs
+for (i in 3:ncol(POBR.mixed)){
+  POBR.mixed[base::sample(which(is.na(POBR.mixed[,i])),size=0.5*length(which(is.na(POBR.mixed[,i])))),i]<-0
+    
+  POBR.mixed[,i]<-replace_na(POBR.mixed[,i], DrugInfo[i-2,'LOQ']/2)
+}
+POBR.mixed$tot.conc<-rowSums(POBR.mixed[,3:94],na.rm = T)
+
+
+#############################
+### Resampling approaches ###
+#############################
+
+# re-sample from each of these types for each drug and apply them to the discharge time-series
+
+#Set up the function "estimate load", which takes the inputs "site.type.drug" (a vector) specifying which site, the type of estimation for BDL data, and which drug (e.g. "POBR.zeros$tot.conc") and the site-specific, gap-filled Q timeseries (a vector, e.g. "POBR.Q.seq")
+estimate.load<- function(site.type.drug,Q.seq){ 
+  sample<-base::sample(site.type.drug,size = nrow(Q.seq),replace = T) # this part randomly samples from the concentrations, with replacement, and applies them to the discharge timeseries
+  tot.load<-sum(sample*Q.seq$Q_Ls*300)/1e+09 # this part multiplies concentration by discharge and sums over the discharge time series to give a total load in grams
+  return(tot.load)
+}
+
+### NOW, apply a bootstrap, and repeat it for each drug and each type of estimation
+
+runs<-10000
+
+cl <- makeCluster(3)
+registerDoParallel(cl)  # initiate the cluster to run in parallel
+
+#POBR.zeros.MC<-list()
+#for (i in 3:ncol(POBR.zeros)){
+#  POBR.zeros.MC[[i-2]]<-replicate(runs,estimate.load(POBR.zeros[,i],POBR.Q.seq))
+#}
+#names(POBR.zeros.MC)<-colnames(POBR.zeros)[3:ncol(POBR.zeros)]
+
+POBR.zeros.MC <- foreach(i=3:ncol(POBR.zeros), .combine = "cbind.data.frame") %dopar% { 
+  replicate(runs,estimate.load(POBR.zeros[,i],POBR.Q.seq))
+}
+names(POBR.zeros.MC)<-colnames(POBR.zeros)[3:ncol(POBR.zeros)]
+# write.csv(POBR.zeros.MC,'POBR.bootstrappedfluxes.zeros.csv',row.names = F)
+
+# mean(POBR.zeros.MC$Amytriptyline)*(1000/75)+mean(POBR.zeros.MC$Mianserin)*(1000/60)+mean(POBR.zeros.MC$Duloxetine)*(1000/60)    is the equivalent of total antidepressants discharged (21)
+# CI((POBR.zeros.MC$Amytriptyline+POBR.zeros.MC$Mianserin+POBR.zeros.MC$Duloxetine),ci=0.95) = [1.32, 1.32], mean = 1.32 g
+
+# mean(POBR.zeros.MC$Ofloxacin)*(1000/400)+mean(POBR.zeros.MC$Trimethoprim)*(1000/400)+mean(POBR.zeros.MC$Clindamycin)    is the equivalent of total antibiotics doses discharged (0.3)
+# CI((POBR.zeros.MC$Ofloxacin+POBR.zeros.MC$Trimethoprim+POBR.zeros.MC$Clindamycin),ci=0.95) = [0.14, 0.14], mean = 0.14 g
+
+# mean(POBR.zeros.MC$Cilazapril)*(1000/2.5)+mean(POBR.zeros.MC$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin drugs discharged (29)
+# CI((POBR.zeros.MC$Cilazapril+POBR.zeros.MC$Irbesartan),ci=0.95) = [0.456, 0.457], mean = 0.457 g
+
+POBR.halfdetect.MC <- foreach(i=3:ncol(POBR.halfdetect), .combine = "cbind.data.frame") %dopar% { 
+  replicate(runs,estimate.load(POBR.halfdetect[,i],POBR.Q.seq))
+}
+names(POBR.halfdetect.MC)<-colnames(POBR.halfdetect)[3:ncol(POBR.halfdetect)]
+# write.csv(POBR.halfdetect.MC,'POBR.bootstrappedfluxes.halfdetect.csv',row.names = F)
+
+# mean(POBR.halfdetect.MC$Amytriptyline)*(1000/75)+mean(POBR.halfdetect.MC$Mianserin)*(1000/60)+mean(POBR.halfdetect.MC$Duloxetine)*(1000/60)    is the equivalent of total antidepressants discharged (32)
+# CI((POBR.halfdetect.MC$Amytriptyline+POBR.halfdetect.MC$Mianserin+POBR.halfdetect.MC$Duloxetine),ci=0.95) = [2.13, 2.13], mean = 2.13 g
+
+# mean(POBR.halfdetect.MC$Ofloxacin)*(1000/400)+mean(POBR.halfdetect.MC$Trimethoprim)*(1000/400)+mean(POBR.halfdetect.MC$Clarithromycin)    is the equivalent of total antibiotics discharged (1.2)
+# CI((POBR.halfdetect.MC$Ofloxacin+POBR.halfdetect.MC$Trimethoprim+POBR.halfdetect.MC$Clarithromycin),ci=0.95) = [0.596, 0.597], mean = 0.596 g
+
+# mean(POBR.halfdetect.MC$Cilazapril)*(1000/2.5)+mean(POBR.halfdetect.MC$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin drugs discharged (69)
+# CI((POBR.halfdetect.MC$Cilazapril+POBR.halfdetect.MC$Irbesartan),ci=0.95) = [0.714, 0.715], mean = 0.715 g
+
+
+
+POBR.mixed.MC <- foreach(i=3:ncol(POBR.mixed), .combine = "cbind.data.frame") %dopar% { 
+  replicate(runs,estimate.load(POBR.mixed[,i],POBR.Q.seq))
+}
+names(POBR.mixed.MC)<-colnames(POBR.mixed)[3:ncol(POBR.mixed)]
+# write.csv(POBR.mixed.MC,'POBR.bootstrappedfluxes.mixed.csv',row.names = F)
+
+# mean(POBR.mixed.MC$Amytriptyline)*(1000/75)+mean(POBR.mixed.MC$Mianserin)*(1000/60)+mean(POBR.mixed.MC$Duloxetine)*(1000/60)    is the equivalent of total antidepressants discharged (27)
+# CI((POBR.mixed.MC$Amytriptyline+POBR.mixed.MC$Mianserin+POBR.mixed.MC$Duloxetine),ci=0.95) = [1.74, 1.74], mean = 1.74 g
+
+# mean(POBR.mixed.MC$Ofloxacin)*(1000/400)+mean(POBR.mixed.MC$Trimethoprim)*(1000/400)+mean(POBR.mixed.MC$Clarithromycin)    is the equivalent of total antibiotics discharged (0.78)
+# CI((POBR.mixed.MC$Ofloxacin+POBR.mixed.MC$Trimethoprim+POBR.mixed.MC$Clarithromycin),ci=0.95) = [0.363, 0.363], mean = 0.363 g
+
+# mean(POBR.mixed.MC$Cilazapril)*(1000/2.5)+mean(POBR.mixed.MC$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin drugs discharged (49)
+# CI((POBR.mixed.MC$Cilazapril+POBR.mixed.MC$Irbesartan),ci=0.95) = [0.587, 0.588], mean = 0.588 g
+
+
+#stopCluster(cl)
+
+#############################################
+### Interpolated concentration approaches ###
+#############################################
+
+POBR.datetime<-data.frame(date=as_date(POBR.datetime),datetime=POBR.datetime,round.datetime=ymd_hms(round_date(POBR.datetime,unit="5 mins"))) # make the datetime round to match with the Q timeseries
+POBR.Q.seq$DateTime<-ymd_hms(POBR.Q.seq$DateTime)
+
+
+POBR.zeros.dt<-left_join(POBR.zeros,POBR.datetime,by='date') #join the times to the conc
+POBR.zeros.interpload<-left_join(POBR.Q.seq,POBR.zeros.dt,by=c('DateTime'='round.datetime'))
+for (i in 10:101){
+  POBR.zeros.interpload[1:136,i]<-POBR.zeros.interpload[137,i]
+  POBR.zeros.interpload[,i]<-na.approx( POBR.zeros.interpload[,i],na.rm = F) #linearly interpolate concentrations
+  POBR.zeros.interpload[104961:nrow(POBR.zeros.interpload),i]<-POBR.zeros.dt[43,i-7]
+}
+POBR.zeros.interpload$tot.conc<-rowSums(POBR.zeros.interpload[,10:101])
+
+POBR.zeros.interp.annual<-data.frame(matrix(ncol = 93, nrow = 1))
+names(POBR.zeros.interp.annual)<-names(POBR.zeros.interpload)[10:102]
+for (i in 1:ncol(POBR.zeros.interp.annual)){
+  POBR.zeros.interp.annual[1,i]<-sum(POBR.zeros.interpload['Q_Ls']*POBR.zeros.interpload[,i+9]*300/1e+09)
+}
+
+# mean(POBR.zeros.interp.annual$Amytriptyline)*(1000/75)+mean(POBR.zeros.interp.annual$Mianserin)*(1000/60)+mean(POBR.zeros.interp.annual$Duloxetine)*(1000/60)    is the equivalent of total antidepressants discharged (10.5)
+# POBR.zeros.interp.annual$Amytriptyline+POBR.zeros.interp.annual$Mianserin+POBR.zeros.interp.annual$Duloxetine = 0.675 g
+
+# mean(POBR.zeros.interp.annual$Ofloxacin)*(1000/400)+mean(POBR.zeros.interp.annual$Trimethoprim)*(1000/400)+mean(POBR.zeros.interp.annual$Clarithromycin)    is the equivalent of total antibiotics discharged (0.28)
+# POBR.zeros.interp.annual$Ofloxacin+POBR.zeros.interp.annual$Trimethoprim+POBR.zeros.interp.annual$Clarithromycin = 0.110 g
+
+# mean(POBR.zeros.interp.annual$Cilazapril)*(1000/2.5)+mean(POBR.zeros.interp.annual$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin drugs discharged (24)
+# POBR.zeros.interp.annual$Cilazapril+POBR.zeros.interp.annual$Irbesartan = 0.276 g
+
+POBR.halfdetect.dt<-left_join(POBR.halfdetect,POBR.datetime,by='date') #join the times to the conc
+POBR.halfdetect.interpload<-left_join(POBR.Q.seq,POBR.halfdetect.dt,by=c('DateTime'='round.datetime'))
+for (i in 10:101){
+  POBR.halfdetect.interpload[1:136,i]<-POBR.halfdetect.interpload[137,i]
+  POBR.halfdetect.interpload[,i]<-na.approx( POBR.halfdetect.interpload[,i],na.rm = F) #linearly interpolate concentrations
+  POBR.halfdetect.interpload[104961:nrow(POBR.halfdetect.interpload),i]<-POBR.halfdetect.dt[43,i-7]
+}
+POBR.halfdetect.interpload$tot.conc<-rowSums(POBR.halfdetect.interpload[,10:101])
+
+POBR.halfdetect.interp.annual<-data.frame(matrix(ncol = 93, nrow = 1))
+names(POBR.halfdetect.interp.annual)<-names(POBR.halfdetect.interpload)[10:102]
+for (i in 1:ncol(POBR.halfdetect.interp.annual)){
+  POBR.halfdetect.interp.annual[1,i]<-sum(POBR.halfdetect.interpload['Q_Ls']*POBR.halfdetect.interpload[,i+9]*300/1e+09)
+}
+
+POBR.interp<-rbind(POBR.zeros.interp.annual,POBR.halfdetect.interp.annual)
+POBR.interp$method<-c("zeros","halfdetect")
+write.csv(POBR.interp,"POBR.interp.csv",row.names = F)
+
+# mean(POBR.halfdetect.interp.annual$Amytriptyline)*(1000/75)+mean(POBR.halfdetect.interp.annual$Mianserin)*(1000/60)+mean(POBR.halfdetect.interp.annual$Duloxetine)*(1000/60)    is the equivalent of total antidepressants discharged (22.6)
+# POBR.halfdetect.interp.annual$Amytriptyline+POBR.halfdetect.interp.annual$Mianserin+POBR.halfdetect.interp.annual$Duloxetine = 1.51 g
+
+# mean(POBR.halfdetect.interp.annual$Ofloxacin)*(1000/400)+mean(POBR.halfdetect.interp.annual$Trimethoprim)*(1000/400)+mean(POBR.halfdetect.interp.annual$Clarithromycin)    is the equivalent of total antibiotics discharged (1.20)
+# POBR.halfdetect.interp.annual$Ofloxacin+POBR.halfdetect.interp.annual$Trimethoprim+POBR.halfdetect.interp.annual$Clarithromycin = 0.584 g
+
+# mean(POBR.halfdetect.interp.annual$Cilazapril)*(1000/2.5)+mean(POBR.halfdetect.interp.annual$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin drugs discharged (65)
+# POBR.halfdetect.interp.annual$Cilazapril+POBR.halfdetect.interp.annual$Irbesartan = 0.538 g
+
+
+
+### For the mixed approach, it matters which values end up where, so we'll use a resampling approach here:
+
+POBR.mixed.list<-replicate(10000,POBR.tidydrugs,simplify=F)
+ for (i in 1:length(POBR.mixed.list)){
+  foo<-POBR.mixed.list[[i]]
+  for (j in 3:ncol(POBR.tidydrugs)){
+    foo[base::sample(which(is.na(foo[,j])),size=0.5*length(which(is.na(foo[,j])))),j]<-0
+    foo[,j]<-replace_na(foo[,j], DrugInfo[j-2,'LOQ']/2)
+  }
+  POBR.mixed.list[[i]]<-left_join(foo,POBR.datetime,by='date')
+}
+
+POBR.mixed.interp.MC <- data.frame(matrix(ncol = 92, nrow = 10000))
+colnames(POBR.mixed.interp.MC) <- colnames(POBR.tidydrugs)[3:94]
+
+for (i in 1:length(POBR.mixed.list)){
+  mango<-left_join(POBR.Q.seq,POBR.mixed.list[[i]],by=c('DateTime'='round.datetime'))
+   for (j in 1:92){
+      mango[1:136,j+9]<-mango[137,j+9]
+      mango[,j+9]<-na.approx(mango[,j+9],na.rm = F) #linearly interpolate concentrations
+      mango[104961:nrow(mango),j+9]<-mango[104960,j+9]  # now we have a dataframe for the interpolated concentrations of each drug over the Q timeseries, so we multiply each drug by Q and sum it to get annual flux, then and save each interaction in its own row of a dataframe
+      POBR.mixed.interp.MC[i,j]<-sum(mango['Q_Ls']*mango[,j+9]*300/1e+09)
+     
+  }
+}  
+write.csv(POBR.mixed.interp.MC,"POBR.mixed_interpolation.BootstrapResults.csv",row.names = F)
+  
+# mean(POBR.mixed.interp.MC$Amytriptyline)*(1000/75)+mean(POBR.mixed.interp.MC$Mianserin)*(1000/60)+mean(POBR.mixed.interp.MC$Duloxetine)*(1000/60)    is the equivalent of total antidepressants discharged (16.7)
+# CI(POBR.mixed.interp.MC$Amytriptyline+POBR.mixed.interp.MC$Mianserin+POBR.mixed.interp.MC$Duloxetine,ci=0.95) = [1.100, 1.100], mean = 1.100 g
+
+# mean(POBR.mixed.interp.MC$Ofloxacin)*(1000/400)+mean(POBR.mixed.interp.MC$Trimethoprim)*(1000/400)+mean(POBR.mixed.interp.MC$Clindamycin)    is the equivalent of total antibiotics discharged (0.75)
+# CI(POBR.mixed.interp.MC$Ofloxacin+POBR.mixed.interp.MC$Trimethoprim+POBR.mixed.interp.MC$Clarithromycin,ci=0.95) = [0.346, 0.347], mean = 0.347 g
+
+# mean(POBR.mixed.interp.MC$Cilazapril)*(1000/2.5)+mean(POBR.mixed.interp.MC$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin drugs discharged (44.5)
+# CI(POBR.mixed.interp.MC$Cilazapril+POBR.mixed.interp.MC$Irbesartan,ci=0.95) = [0.409, 0.409], mean = 0.409 g
+
+```
+
+
+```{r Load estimates at Glydon}
+
+#use chemistry sampling time stamps to estimate time for pharma sampling
+chem.data<-read.csv(file="bes.waterchem.clean.csv", header=T)
+chem.data$Date<-dmy(chem.data$Date)
+chem.data$Site<-as.character(chem.data$Site)
+pharma.sampletimes<-subset(chem.data, Date>=ymd("171102") & Date <=ymd("181115"))[c("Date","time","Site")]
+
+#join the sample times to the drug data and subset for Carroll Park
+pharma.GFGL<-subset(right_join(pharma.sampletimes,tidy.drugdata,by=c("Date"="date","Site"="site")),Site=="GFGL")[-35,]
+pharma.GFGL$time[which(as.character(pharma.GFGL$time)=="2.04")]<-NA
+
+#calculate an "average sampling time" to estimate the dates without recorded sampling time (n=3).
+samp.times<-matrix(unlist(strsplit(as.character(pharma.GFGL$time[which(!is.na(pharma.GFGL$time))]),":")), ncol=2, byrow=TRUE)
+mean(as.numeric(samp.times[,1])*60+as.numeric(samp.times[,2]))/60 #10.5407
+0.5407*60 #32 mins
+#average sampling time is 10:32 am, replace the NAs
+pharma.GFGL$time[which(is.na(pharma.GFGL$time))]<-"10:32"
+
+### using Q measurements within 30 min on either side of sample time, estimate instantaneous flow as the mean in this window (and also record the sd and N_Obs in the window)
+GFGL.datetime<-ymd_hm(paste(pharma.GFGL$Date,pharma.GFGL$time))
+GFGL.sample.Q<-list() #For each sample time, extract the Q in the window
+for (i in 1:length(GFGL.datetime)){
+  GFGL.sample.Q[[i]]<-subset(GFGL.instaflow,ymd_hms(DateTime)>=GFGL.datetime[i]-30*60&ymd_hms(DateTime)<=GFGL.datetime[i]+30*60)
+}
+# Calculate mean flow in the window
+GFGL.pharma.Q<-data.frame(Date=pharma.GFGL$Date,time=pharma.GFGL$time,Q.Ls.mean=rep(NA,times=length(pharma.GFGL$time)),Q.Ls.sd=rep(NA,times=length(pharma.GFGL$time)),Q.Ls.n=rep(NA,times=length(pharma.GFGL$time)))
+for (i in 1:nrow(GFGL.pharma.Q)){
+ GFGL.pharma.Q$Q.Ls.mean[i]<-mean(GFGL.sample.Q[[i]]$Q_Ls) 
+ GFGL.pharma.Q$Q.Ls.sd[i]<-sd(GFGL.sample.Q[[i]]$Q_Ls) 
+ GFGL.pharma.Q$Q.Ls.n[i]<-length(GFGL.sample.Q[[i]]$Q_Ls) 
+}
+
+GFGL.load<-full_join(GFGL.pharma.Q,pharma.GFGL,by=c("Date"="Date","time"="time"))
+
+#plot the C-Q relationship for total.conc
+png("Figures/GFGL.totalconc.vs.Q.png",height=12,width=12,units='cm',res=300)
+par(mar = c(3,3,0.8,0.5))
+par(mgp=c(1.3,0.2,0))
+plot(GFGL.load$tot.conc+1~GFGL.load$Q.Ls.mean,log="xy",xlab=expression(paste("Q (Ls"^-1,")")),ylab=expression(paste("sum concentration+1 (ng L"^-1,")")),pch=16,axes=F)
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+dev.off()
+
+
+### Load estimates for GFGL!
+GFGL.sub.names<-colnames(GFGL.load)[colSums(!is.na(GFGL.load)) > 0] #which drugs are detected at GFGL
+GFGL.subset<-GFGL.load[names(GFGL.load) %in% GFGL.sub.names]
+
+#first, calculate and plot timeseries
+GFGL.color<-left_join(data.frame(Names=GFGL.sub.names[7:22],Class=DrugInfo[DrugInfo$Name %in% GFGL.sub.names,]$Class),data.frame(Class=unique(DrugInfo[DrugInfo$Name %in% GFGL.sub.names,]$Class),color=c("#8dd3c7",
+"#ffffb3",
+"#bebada",
+"#fb8072",
+"#80b1d3",
+"#fdb462",
+"#b3de69",
+"#fccde5")))
+
+
+png("Figures/GFGL.totalload.timeseries.png",height=10,width=15,units='cm',res=300)
+par(mar = c(3,3,0.8,0.5))
+par(mgp=c(1.3,0.2,0))
+plot((GFGL.load$tot.conc*GFGL.load$Q.Ls.mean)*3600/1E+09~ymd(GFGL.load$Date),xlab="",ylab=expression(paste("load (g h"^-1,")")),type="n",axes=F)
+for (i in 1:length(GFGL.sub.names[7:15])){
+points((GFGL.load[,which(colnames(GFGL.load)==GFGL.sub.names[i+6])]*GFGL.load$Q.Ls.mean)*3600/1e+09~ymd(GFGL.load$Date),col=as.character(GFGL.color$color[which(GFGL.color$Names==GFGL.sub.names[i+6])]),pch=16)  
+}
+points((GFGL.load$tot.conc*GFGL.load$Q.Ls.mean)*3600/1E+09~ymd(GFGL.load$Date),pch=0,lwd=2)
+axis(1,tck=0.02, cex.axis=0.8,at=ymd(c("2017-11-01","2018-01-01","2018-03-01","2018-05-01","2018-07-01","2018-09-01","2018-11-01")),labels=c("Nov17","Jan18","Mar18","May18","Jul18","Sep18","Nov18")) 
+axis(2,tck=0.02,cex.axis=0.8)
+box()
+legend('topleft',c(as.character(unique(GFGL.color$Class)),"TOTAL"),col = c(as.character(unique(GFGL.color$color)),"black"),pch=c(rep(16,times=10),0),pt.lwd = c(rep(0,times=10),2),cex=0.75,bty='n')
+                                                                                                                
+dev.off()
+
+#######################
+### Q interpolation ###
+#######################
+
+GFGL.Q<-subset(GFGL.instaflow,DateTime>=ymd_hms("2017-11-02 00:00:00") & DateTime<ymd_hms("2018-11-02 00:00:00"))
+fiveminseq<-data.frame(DateTime=seq(from=ymd_hms("2017-11-02 00:00:00"), to = ymd_hms("2018-11-01 23:55:00"),by='5 min')) # create a full time series for the year of discharge
+GFGL.Q.seq<-left_join(fiveminseq,GFGL.Q) # join the USGS Q to the full timeseries
+GFGL.Q.seq$Q_Ls<-na.approx(GFGL.Q.seq$Q_Ls,na.rm = F) # linearly interpolate missing Q values
+GFGL.Q.seq$Q_Ls[105119:105120]<-GFGL.Q.seq$Q_Ls[105118]
+
+#######################
+### Median approach ###
+#######################
+
+#Extrapolating median concentrations: 
+GFGL.tot.conc.med<-median(GFGL.load$tot.conc) # 5 ng
+GFGL.tot.conc.mean<-mean(GFGL.load$tot.conc) # 61.16 ng
+GFGL.tot.load.med<-sum(GFGL.Q.seq$Q_Ls*GFGL.tot.conc.med*300)/1e+09
+GFGL.tot.load.mean<-sum(GFGL.Q.seq$Q_Ls*GFGL.tot.conc.mean*300)/1e+09
+#Q measurements are every 5 mins; we estimate a total of 3.22 g (median) to 39.44 g (mean) pharmaceuticals total are discharged through this stream reach
+
+GFGL.antidepressant<-data.frame(amyt=GFGL.load$Amytriptyline,mian=GFGL.load$Mianserin,dulox=GFGL.load$Duloxetine)
+GFGL.antidepressant[is.na(GFGL.antidepressant)]<-0
+mean.antidepressant.prop<-with(subset(data.frame(antidepressant=rowSums(GFGL.antidepressant),tot=GFGL.load$tot.conc),tot>0),mean(antidepressant/tot)) 
+GFGL.tot.load.med*mean.antidepressant.prop
+GFGL.tot.load.mean*mean.antidepressant.prop
+#on average, 11.07% of the total load at Glyndon is antidepressants, meaning that the watershed is contributing  0.357 g (median) to 4.37 g (mean) of antidepressants annually
+
+GFGL.antibiotic<-data.frame(cipro=GFGL.load$Ciprofloxacin,oflox=GFGL.load$Ofloxacin,trimeth=GFGL.load$Trimethoprim,roxi=GFGL.load$Roxithromycin)
+GFGL.antibiotic[is.na(GFGL.antibiotic)]<-0
+mean.antibiotic.prop<-with(subset(data.frame(antibiotic=rowSums(GFGL.antibiotic),tot=GFGL.load$tot.conc),tot>0),mean(antibiotic/tot)) 
+GFGL.tot.load.med*mean.antibiotic.prop
+GFGL.tot.load.mean*mean.antibiotic.prop
+#on average, 51.47% of the total load at Pond Branch is antibiotics, meaning that the watershed is contributing 1.66 g (median) to 20.30 g (mean) of antibiotics annually, the equivalent of 2665 daily doses
+
+#####################################
+### SET UP DIFFERENT "APPROACHES" ###
+#####################################
+
+## create three versions of the GFGL drug data: all NAs filled with zeros, all NAs filled with 0.5 detection limit, and a 50-50 mix of the two:
+GFGL.tidydrugs<-subset(tidy.drugdata,site=="GFGL")
+GFGL.zeros<-GFGL.tidydrugs
+GFGL.zeros[is.na(GFGL.zeros)] = 0
+GFGL.zeros$tot.conc<-rowSums(GFGL.zeros[,3:94],na.rm = T)
+
+GFGL.halfdetect<-GFGL.tidydrugs
+for (i in 3:ncol(GFGL.halfdetect)){
+  GFGL.halfdetect[,i]<-replace_na(GFGL.halfdetect[,i], DrugInfo[i-2,'LOQ']/2)
+}
+GFGL.halfdetect$tot.conc<-rowSums(GFGL.halfdetect[,3:94],na.rm = T)
+
+GFGL.mixed<-GFGL.tidydrugs
+for (i in 3:ncol(GFGL.mixed)){
+  GFGL.mixed[base::sample(which(is.na(GFGL.mixed[,i])),size=0.5*length(which(is.na(GFGL.mixed[,i])))),i]<-0
+    
+  GFGL.mixed[,i]<-replace_na(GFGL.mixed[,i], DrugInfo[i-2,'LOQ']/2)
+}
+GFGL.mixed$tot.conc<-rowSums(GFGL.mixed[,3:94],na.rm = T)
+
+#############################
+### Resampling approaches ###
+#############################
+
+# re-sample from each of these types for each drug and apply them to the discharge time-series
+
+#Set up the function "estimate load", which takes the inputs "site.type.drug" (a vector) specifying which site, the type of estimation for BDL data, and which drug (e.g. "GFGL.zeros$tot.conc") and the site-specific, gap-filled Q timeseries (a vector, e.g. "GFGL.Q.seq")
+estimate.load<- function(site.type.drug,Q.seq){ 
+  sample<-base::sample(site.type.drug,size = nrow(Q.seq),replace = T) # this part randomly samples from the concentrations, with replacement, and applies them to the discharge timeseries
+  tot.load<-sum(sample*Q.seq$Q_Ls*300)/1e+09 # this part multiplies concentration by discharge and sums over the discharge time series to give a total load in grams
+  return(tot.load)
+}
+
+### NOW, apply a bootstrap, and repeat it for each drug and each type of estimation
+
+runs<-10000
+
+cl <- makeCluster(3)
+registerDoParallel(cl)  # initiate the cluster to run in parallel
+
+#GFGL.zeros.MC<-list()
+#for (i in 3:ncol(GFGL.zeros)){
+#  GFGL.zeros.MC[[i-2]]<-replicate(runs,estimate.load(GFGL.zeros[,i],GFGL.Q.seq))
+#}
+#names(GFGL.zeros.MC)<-colnames(GFGL.zeros)[3:ncol(GFGL.zeros)]
+
+GFGL.zeros.MC <- foreach(i=3:ncol(GFGL.zeros), .combine = "cbind.data.frame") %dopar% { 
+  replicate(runs,estimate.load(GFGL.zeros[,i],GFGL.Q.seq))
+}
+names(GFGL.zeros.MC)<-colnames(GFGL.zeros)[3:ncol(GFGL.zeros)]
+# write.csv(GFGL.zeros.MC,'GFGL.bootstrappedfluxes.zeros.csv',row.names = F)
+
+# mean(GFGL.zeros.MC$Amytriptyline)*(1000/75)+mean(GFGL.zeros.MC$Mianserin)*(1000/60)+mean(GFGL.zeros.MC$Duloxetine)*(1000/60)    is the equivalent of total antidepressants discharged (54)
+# CI((GFGL.zeros.MC$Amytriptyline+GFGL.zeros.MC$Mianserin+GFGL.zeros.MC$Duloxetine),ci=0.95) = [3.85, 3.88], mean = 3.86 g
+
+# mean(GFGL.zeros.MC$Ofloxacin)*(1000/400)+mean(GFGL.zeros.MC$Trimethoprim)*(1000/400)+mean(GFGL.zeros.MC$Ciprofloxacin)+mean(GFGL.zeros.MC$Roxithromycin)*(1000/300)    is the equivalent of total antibiotics doses discharged (5.2)
+# CI((GFGL.zeros.MC$Ofloxacin+GFGL.zeros.MC$Trimethoprim+GFGL.zeros.MC$Ciprofloxacin+GFGL.zeros.MC$Roxithromycin),ci=0.95) = [2.01, 2.01], mean = 2.01 g
+
+# mean(GFGL.zeros.MC$Cilazapril)*(1000/2.5)+mean(GFGL.zeros.MC$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin drugs discharged (365)
+# CI((GFGL.zeros.MC$Cilazapril+GFGL.zeros.MC$Irbesartan),ci=0.95) = [27.34, 27.47], mean = 27.40 g
+
+GFGL.halfdetect.MC <- foreach(i=3:ncol(GFGL.halfdetect), .combine = "cbind.data.frame") %dopar% { 
+  replicate(runs,estimate.load(GFGL.halfdetect[,i],GFGL.Q.seq))
+}
+names(GFGL.halfdetect.MC)<-colnames(GFGL.halfdetect)[3:ncol(GFGL.halfdetect)]
+# write.csv(GFGL.halfdetect.MC,'GFGL.bootstrappedfluxes.halfdetect.csv',row.names = F)
+
+# mean(GFGL.halfdetect.MC$Amytriptyline)*(1000/75)+mean(GFGL.halfdetect.MC$Mianserin)*(1000/60)+mean(GFGL.halfdetect.MC$Duloxetine)*(1000/60)    is the equivalent of total antidepressants discharged (122)
+# CI((GFGL.halfdetect.MC$Amytriptyline+GFGL.halfdetect.MC$Mianserin+GFGL.halfdetect.MC$Duloxetine),ci=0.95) = [8.56, 8.58], mean = 8.57 g
+
+# mean(GFGL.halfdetect.MC$Ofloxacin)*(1000/400)+mean(GFGL.halfdetect.MC$Trimethoprim)*(1000/400)+mean(GFGL.halfdetect.MC$Ciprofloxacin)+mean(GFGL.halfdetect.MC$Roxithromycin)*(1000/300)    is the equivalent of total antibiotics doses discharged (27.6)
+# CI((GFGL.halfdetect.MC$Ofloxacin+GFGL.halfdetect.MC$Trimethoprim+GFGL.halfdetect.MC$Ciprofloxacin+GFGL.halfdetect.MC$Roxithromycin),ci=0.95) = [11.30, 11.30], mean = 11.30 g
+
+# mean(GFGL.halfdetect.MC$Cilazapril)*(1000/2.5)+mean(GFGL.halfdetect.MC$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin drugs discharged (600)
+# CI((GFGL.halfdetect.MC$Cilazapril+GFGL.halfdetect.MC$Irbesartan),ci=0.95) = [28.765, 28.891], mean = 28.828 g
+
+
+GFGL.mixed.MC <- foreach(i=3:ncol(GFGL.mixed), .combine = "cbind.data.frame") %dopar% { 
+  replicate(runs,estimate.load(GFGL.mixed[,i],GFGL.Q.seq))
+}
+names(GFGL.mixed.MC)<-colnames(GFGL.mixed)[3:ncol(GFGL.mixed)]
+# write.csv(GFGL.mixed.MC,'GFGL.bootstrappedfluxes.mixed.csv',row.names = F)
+
+# mean(GFGL.mixed.MC$Amytriptyline)*(1000/75)+mean(GFGL.mixed.MC$Mianserin)*(1000/60)+mean(GFGL.mixed.MC$Duloxetine)*(1000/60)    is the equivalent of total antidepressants discharged (88)
+# CI((GFGL.mixed.MC$Amytriptyline+GFGL.mixed.MC$Mianserin+GFGL.mixed.MC$Duloxetine),ci=0.95) = [6.247, 6.271], mean = 6.259 g
+
+# mean(GFGL.mixed.MC$Ofloxacin)*(1000/400)+mean(GFGL.mixed.MC$Trimethoprim)*(1000/400)+mean(GFGL.mixed.MC$Ciprofloxacin)+mean(GFGL.mixed.MC$Roxithromycin)*(1000/300)    is the equivalent of total antibiotics doses discharged (16.6)
+# CI((GFGL.mixed.MC$Ofloxacin+GFGL.mixed.MC$Trimethoprim+GFGL.mixed.MC$Ciprofloxacin+GFGL.mixed.MC$Roxithromycin),ci=0.95) = [6.748, 6.753], mean = 6.751 g
+
+# mean(GFGL.mixed.MC$Cilazapril)*(1000/2.5)+mean(GFGL.mixed.MC$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin drugs discharged (486)
+# CI((GFGL.mixed.MC$Cilazapril+GFGL.mixed.MC$Irbesartan),ci=0.95) = [28.108, 28.234], mean = 28.171 g
+
+#stopCluster(cl)
+
+#############################################
+### Interpolated concentration approaches ###
+#############################################
+
+GFGL.datetime<-data.frame(date=as_date(GFGL.datetime),datetime=GFGL.datetime,round.datetime=ymd_hms(round_date(GFGL.datetime,unit="5 mins"))) # make the datetime round to match with the Q timeseries
+GFGL.Q.seq$DateTime<-ymd_hms(GFGL.Q.seq$DateTime)
+
+
+GFGL.zeros.dt<-left_join(GFGL.zeros,GFGL.datetime,by='date') #join the times to the conc
+GFGL.zeros.interpload<-left_join(GFGL.Q.seq,GFGL.zeros.dt,by=c('DateTime'='round.datetime'))
+for (i in 10:101){
+  GFGL.zeros.interpload[1:125,i]<-GFGL.zeros.interpload[126,i]
+  GFGL.zeros.interpload[,i]<-na.approx( GFGL.zeros.interpload[,i],na.rm = F) #linearly interpolate concentrations
+  GFGL.zeros.interpload[104953:nrow(GFGL.zeros.interpload),i]<-GFGL.zeros.dt[45,i-7]
+}
+GFGL.zeros.interpload$tot.conc<-rowSums(GFGL.zeros.interpload[,10:101])
+
+GFGL.zeros.interp.annual<-data.frame(matrix(ncol = 93, nrow = 1))
+names(GFGL.zeros.interp.annual)<-names(GFGL.zeros.interpload)[10:102]
+for (i in 1:ncol(GFGL.zeros.interp.annual)){
+  GFGL.zeros.interp.annual[1,i]<-sum(GFGL.zeros.interpload['Q_Ls']*GFGL.zeros.interpload[,i+9]*300/1e+09)
+}
+
+# mean(GFGL.zeros.interp.annual$Amytriptyline)*(1000/75)+mean(GFGL.zeros.interp.annual$Mianserin)*(1000/60)+mean(GFGL.zeros.interp.annual$Duloxetine)*(1000/60)    is the equivalent of total antidepressants discharged (37.148)
+# GFGL.zeros.interp.annual$Amytriptyline+GFGL.zeros.interp.annual$Mianserin+GFGL.zeros.interp.annual$Duloxetine = 2.501 g
+
+# mean(GFGL.zeros.interp.annual$Ofloxacin)*(1000/400)+mean(GFGL.zeros.interp.annual$Trimethoprim)*(1000/400)+mean(GFGL.zeros.interp.annual$Ciprofloxacin)+mean(GFGL.zeros.interp.annual$Roxithromycin)*(1000/300)    is the equivalent of total antibiotics doses discharged (2.763)
+# GFGL.zeros.interp.annual$Ofloxacin+GFGL.zeros.interp.annual$Trimethoprim+GFGL.zeros.interp.annual$Ciprofloxacin+GFGL.zeros.interp.annual$Roxithromycin = 1.079 g
+
+# mean(GFGL.zeros.interp.annual$Cilazapril)*(1000/2.5)+mean(GFGL.zeros.interp.annual$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin drugs discharged (134)
+# GFGL.zeros.interp.annual$Cilazapril+GFGL.zeros.interp.annual$Irbesartan = 13.53 g
+
+GFGL.halfdetect.dt<-left_join(GFGL.halfdetect,GFGL.datetime,by='date') #join the times to the conc
+GFGL.halfdetect.interpload<-left_join(GFGL.Q.seq,GFGL.halfdetect.dt,by=c('DateTime'='round.datetime'))
+for (i in 10:101){
+  GFGL.halfdetect.interpload[1:125,i]<-GFGL.halfdetect.interpload[126,i]
+  GFGL.halfdetect.interpload[,i]<-na.approx( GFGL.halfdetect.interpload[,i],na.rm = F) #linearly interpolate concentrations
+  GFGL.halfdetect.interpload[104953:nrow(GFGL.halfdetect.interpload),i]<-GFGL.halfdetect.dt[45,i-7]
+}
+GFGL.halfdetect.interpload$tot.conc<-rowSums(GFGL.halfdetect.interpload[,10:101])
+
+GFGL.halfdetect.interp.annual<-data.frame(matrix(ncol = 93, nrow = 1))
+names(GFGL.halfdetect.interp.annual)<-names(GFGL.halfdetect.interpload)[10:102]
+for (i in 1:ncol(GFGL.halfdetect.interp.annual)){
+  GFGL.halfdetect.interp.annual[1,i]<-sum(GFGL.halfdetect.interpload['Q_Ls']*GFGL.halfdetect.interpload[,i+9]*300/1e+09)
+}
+
+GFGL.interp<-rbind(GFGL.zeros.interp.annual,GFGL.halfdetect.interp.annual)
+GFGL.interp$method<-c("zeros","halfdetect")
+write.csv(GFGL.interp,"GFGL.interp.csv",row.names = F)
+
+# mean(GFGL.halfdetect.interp.annual$Amytriptyline)*(1000/75)+mean(GFGL.halfdetect.interp.annual$Mianserin)*(1000/60)+mean(GFGL.halfdetect.interp.annual$Duloxetine)*(1000/60)    is the equivalent of total antidepressants discharged (103.6)
+# GFGL.halfdetect.interp.annual$Amytriptyline+GFGL.halfdetect.interp.annual$Mianserin+GFGL.halfdetect.interp.annual$Duloxetine = 7.128 g
+
+# mean(GFGL.halfdetect.interp.annual$Ofloxacin)*(1000/400)+mean(GFGL.halfdetect.interp.annual$Trimethoprim)*(1000/400)+mean(GFGL.halfdetect.interp.annual$Ciprofloxacin)+mean(GFGL.halfdetect.interp.annual$Roxithromycin)*(1000/300)    is the equivalent of total antibiotics doses discharged (25.9)
+# GFGL.halfdetect.interp.annual$Ofloxacin+GFGL.halfdetect.interp.annual$Trimethoprim+GFGL.halfdetect.interp.annual$Ciprofloxacin+GFGL.halfdetect.interp.annual$Roxithromycin = 10.673 g
+
+# mean(GFGL.halfdetect.interp.annual$Cilazapril)*(1000/2.5)+mean(GFGL.halfdetect.interp.annual$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin drugs discharged (381.37)
+# GFGL.halfdetect.interp.annual$Cilazapril+GFGL.halfdetect.interp.annual$Irbesartan = 15.041 g
+#For the mixed approach, it matters which values end up where, so we'll use a resampling approach here:
+
+GFGL.mixed.list<-replicate(10000,GFGL.tidydrugs,simplify=F)
+ for (i in 1:length(GFGL.mixed.list)){
+  foo<-GFGL.mixed.list[[i]]
+  for (j in 3:ncol(GFGL.tidydrugs)){
+    foo[base::sample(which(is.na(foo[,j])),size=0.5*length(which(is.na(foo[,j])))),j]<-0
+    foo[,j]<-replace_na(foo[,j], DrugInfo[j-2,'LOQ']/2)
+  }
+  GFGL.mixed.list[[i]]<-left_join(foo,GFGL.datetime,by='date')
+}
+
+GFGL.mixed.interp.MC <- data.frame(matrix(ncol = 92, nrow = 10000))
+colnames(GFGL.mixed.interp.MC) <- colnames(GFGL.tidydrugs)[3:94]
+
+for (i in 1:length(GFGL.mixed.list)){
+  mango<-left_join(GFGL.Q.seq,GFGL.mixed.list[[i]],by=c('DateTime'='round.datetime'))
+   for (j in 1:92){
+      mango[1:125,j+9]<-mango[126,j+9]
+      mango[,j+9]<-na.approx(mango[,j+9],na.rm = F) #linearly interpolate concentrations
+      mango[104953:nrow(mango),j+9]<-mango[104952,j+9]  # now we have a dataframe for the interpolated concentrations of each drug over the Q timeseries, so we multiply each drug by Q and sum it to get annual flux, then and save each interaction in its own row of a dataframe
+      GFGL.mixed.interp.MC[i,j]<-sum(mango['Q_Ls']*mango[,j+9]*300/1e+09)
+     
+  }
+}  
+write.csv(GFGL.mixed.interp.MC,"GFGL.mixed_interpolation.BootstrapResults.csv",row.names = F)
+  
+# mean(GFGL.mixed.interp.MC$Amytriptyline)*(1000/75)+mean(GFGL.mixed.interp.MC$Mianserin)*(1000/60)+mean(GFGL.mixed.interp.MC$Duloxetine)*(1000/60)    is the equivalent of total antidepressants discharged (71)
+# CI(GFGL.mixed.interp.MC$Amytriptyline+GFGL.mixed.interp.MC$Mianserin+GFGL.mixed.interp.MC$Duloxetine, ci=0.95) = [4.847, 4.863], mean = 4.855 g
+
+# mean(GFGL.mixed.interp.MC$Ofloxacin)*(1000/400)+mean(GFGL.mixed.interp.MC$Trimethoprim)*(1000/400)+mean(GFGL.mixed.interp.MC$Ciprofloxacin)+mean(GFGL.mixed.interp.MC$Roxithromycin)*(1000/300)    is the equivalent of total antibiotics doses discharged (14.6)
+# CI(GFGL.mixed.interp.MC$Ofloxacin+GFGL.mixed.interp.MC$Trimethoprim+GFGL.mixed.interp.MC$Ciprofloxacin+GFGL.mixed.interp.MC$Roxithromycin, ci=0.95) = [5.963, 5.991], mean = 5.977 g
+
+# mean(GFGL.mixed.interp.MC$Cilazapril)*(1000/2.5)+mean(GFGL.mixed.interp.MC$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin drugs discharged (260.9)
+# CI(GFGL.mixed.interp.MC$Cilazapril+GFGL.mixed.interp.MC$Irbesartan,ci=0.95) = [14.302, 14.308], mean = 14.305 g
+
+```
+
+
+```{r Load estimates at Villa Nova}
+
+#use chemistry sampling time stamps to estimate time for pharma sampling
+chem.data<-read.csv(file="bes.waterchem.clean.csv", header=T)
+chem.data$Date<-dmy(chem.data$Date)
+chem.data$Site<-as.character(chem.data$Site)
+pharma.sampletimes<-subset(chem.data, Date>=ymd("171102") & Date <=ymd("181115"))[c("Date","time","Site")]
+
+#join the sample times to the drug data and subset for Carroll Park
+pharma.GFVN<-subset(right_join(pharma.sampletimes,tidy.drugdata,by=c("Date"="date","Site"="site")),Site=="GFVN")[-35,]
+pharma.GFVN$time[which(as.character(pharma.GFVN$time)=="2.04")]<-NA
+
+#calculate an "average sampling time" to estimate the dates without recorded sampling time (n=3).
+samp.times<-matrix(unlist(strsplit(as.character(pharma.GFVN$time[which(!is.na(pharma.GFVN$time))]),":")), ncol=2, byrow=TRUE)
+mean(as.numeric(samp.times[,1])*60+as.numeric(samp.times[,2]))/60 #9.609921
+0.609921*60 #37 mins
+#average sampling time is 10:32 am, replace the NAs
+pharma.GFVN$time[which(is.na(pharma.GFVN$time))]<-"9:37"
+
+### using Q measurements within 30 min on either side of sample time, estimate instantaneous flow as the mean in this window (and also record the sd and N_Obs in the window)
+GFVN.datetime<-ymd_hm(paste(pharma.GFVN$Date,pharma.GFVN$time))
+GFVN.sample.Q<-list() #For each sample time, extract the Q in the window
+for (i in 1:length(GFVN.datetime)){
+  GFVN.sample.Q[[i]]<-subset(GFVN.instaflow,ymd_hms(DateTime)>=GFVN.datetime[i]-30*60&ymd_hms(DateTime)<=GFVN.datetime[i]+30*60)
+}
+# Calculate mean flow in the window
+GFVN.pharma.Q<-data.frame(Date=pharma.GFVN$Date,time=pharma.GFVN$time,Q.Ls.mean=rep(NA,times=length(pharma.GFVN$time)),Q.Ls.sd=rep(NA,times=length(pharma.GFVN$time)),Q.Ls.n=rep(NA,times=length(pharma.GFVN$time)))
+for (i in 1:nrow(GFVN.pharma.Q)){
+ GFVN.pharma.Q$Q.Ls.mean[i]<-mean(GFVN.sample.Q[[i]]$Q_Ls) 
+ GFVN.pharma.Q$Q.Ls.sd[i]<-sd(GFVN.sample.Q[[i]]$Q_Ls) 
+ GFVN.pharma.Q$Q.Ls.n[i]<-length(GFVN.sample.Q[[i]]$Q_Ls) 
+}
+
+GFVN.load<-full_join(GFVN.pharma.Q,pharma.GFVN,by=c("Date"="Date","time"="time"))
+
+#plot the C-Q relationship for total.conc
+png("Figures/GFVN.totalconc.vs.Q.png",height=12,width=12,units='cm',res=300)
+par(mar = c(3,3,0.8,0.5))
+par(mgp=c(1.3,0.2,0))
+plot(GFVN.load$tot.conc+1~GFVN.load$Q.Ls.mean,log="xy",xlab=expression(paste("Q (Ls"^-1,")")),ylab=expression(paste("sum concentration+1 (ng L"^-1,")")),pch=16,axes=F)
+axis(1,tck=0.02)
+axis(2,tck=0.02)
+box()
+dev.off()
+
+
+### Load estimates for GFVN!
+GFVN.sub.names<-colnames(GFVN.load)[colSums(!is.na(GFVN.load)) > 0] #which drugs are detected at GFVN
+GFVN.subset<-GFVN.load[names(GFVN.load) %in% GFVN.sub.names]
+
+#first, calculate and plot timeseries
+GFVN.color<-left_join(data.frame(Names=GFVN.sub.names[7:20],Class=DrugInfo[DrugInfo$Name %in% GFVN.sub.names,]$Class),data.frame(Class=unique(DrugInfo[DrugInfo$Name %in% GFVN.sub.names,]$Class),color=c("#8dd3c7",
+"#ffffb3",
+"#bebada",
+"#fb8072",
+"#80b1d3",
+"#fdb462")))
+
+
+png("Figures/GFVN.totalload.timeseries.png",height=10,width=15,units='cm',res=300)
+par(mar = c(3,3,0.8,0.5))
+par(mgp=c(1.3,0.2,0))
+plot((GFVN.load$tot.conc*GFVN.load$Q.Ls.mean)*3600/1E+09~ymd(GFVN.load$Date),xlab="",ylab=expression(paste("load (g h"^-1,")")),type="n",axes=F)
+for (i in 1:length(GFVN.sub.names[7:15])){
+points((GFVN.load[,which(colnames(GFVN.load)==GFVN.sub.names[i+6])]*GFVN.load$Q.Ls.mean)*3600/1e+09~ymd(GFVN.load$Date),col=as.character(GFVN.color$color[which(GFVN.color$Names==GFVN.sub.names[i+6])]),pch=16)  
+}
+points((GFVN.load$tot.conc*GFVN.load$Q.Ls.mean)*3600/1E+09~ymd(GFVN.load$Date),pch=0,lwd=2)
+axis(1,tck=0.02, cex.axis=0.8,at=ymd(c("2017-11-01","2018-01-01","2018-03-01","2018-05-01","2018-07-01","2018-09-01","2018-11-01")),labels=c("Nov17","Jan18","Mar18","May18","Jul18","Sep18","Nov18")) 
+axis(2,tck=0.02,cex.axis=0.8)
+box()
+legend('topleft',c(as.character(unique(GFVN.color$Class)),"TOTAL"),col = c(as.character(unique(GFVN.color$color)),"black"),pch=c(rep(16,times=10),0),pt.lwd = c(rep(0,times=10),2),cex=0.75,bty='n')
+                                                                                                                
+dev.off()
+
+#######################
+### Q interpolation ###
+#######################
+
+GFVN.Q<-subset(GFVN.instaflow,DateTime>=ymd_hms("2017-11-02 00:00:00") & DateTime<ymd_hms("2018-11-02 00:00:00"))
+fiveminseq<-data.frame(DateTime=seq(from=ymd_hms("2017-11-02 00:00:00"), to = ymd_hms("2018-11-01 23:55:00"),by='5 min')) # create a full time series for the year of discharge
+GFVN.Q.seq<-left_join(fiveminseq,GFVN.Q) # join the USGS Q to the full timeseries
+GFVN.Q.seq$Q_Ls<-na.approx(GFVN.Q.seq$Q_Ls,na.rm = F) # linearly interpolate missing Q values
+GFVN.Q.seq$Q_Ls[105119:105120]<-GFVN.Q.seq$Q_Ls[105118]
+
+#######################
+### Median approach ###
+#######################
+
+#Extrapolating median concentrations: 
+GFVN.tot.conc.med<-median(GFVN.load$tot.conc) # 1 ng
+GFVN.tot.conc.mean<-mean(GFVN.load$tot.conc) # 31.1 ng
+GFVN.tot.load.med<-sum(GFVN.Q.seq$Q_Ls*GFVN.tot.conc.med*300)/1e+09
+GFVN.tot.load.mean<-sum(GFVN.Q.seq$Q_Ls*GFVN.tot.conc.mean*300)/1e+09
+#Q measurements are every 5 mins; we estimate a total of 61.73 g (median) to 1919 g (mean) pharmaceuticals total are discharged through this stream reach
+
+GFVN.antidepressant<-data.frame(amyt=GFVN.load$Amytriptyline,mian=GFVN.load$Mianserin,dulox=GFVN.load$Duloxetine)
+GFVN.antidepressant[is.na(GFVN.antidepressant)]<-0
+mean.antidepressant.prop<-with(subset(data.frame(antidepressant=rowSums(GFVN.antidepressant),tot=GFVN.load$tot.conc),tot>0),mean(antidepressant/tot)) 
+GFVN.tot.load.med*mean.antidepressant.prop
+GFVN.tot.load.mean*mean.antidepressant.prop
+#on average, 18.167% of the total load at Glyndon is antidepressants, meaning that the watershed is contributing  11.21 g (median) to 348.6 g (mean) of antidepressants annually
+
+GFVN.antibiotic<-data.frame(cipro=GFVN.load$Ciprofloxacin,oflox=GFVN.load$Ofloxacin,trimeth=GFVN.load$Trimethoprim,roxi=GFVN.load$Roxithromycin)
+GFVN.antibiotic[is.na(GFVN.antibiotic)]<-0
+mean.antibiotic.prop<-with(subset(data.frame(antibiotic=rowSums(GFVN.antibiotic),tot=GFVN.load$tot.conc),tot>0),mean(antibiotic/tot)) 
+GFVN.tot.load.med*mean.antibiotic.prop
+GFVN.tot.load.mean*mean.antibiotic.prop
+#on average, 30.24% of the total load at Pond Branch is antibiotics, meaning that the watershed is contributing 18.67 g (median) to 580.44 g (mean) of antibiotics annually, the equivalent of 2665 daily doses
+
+#####################################
+### SET UP DIFFERENT "APPROACHES" ###
+#####################################
+
+## create three versions of the GFVN drug data: all NAs filled with zeros, all NAs filled with 0.5 detection limit, and a 50-50 mix of the two:
+GFVN.tidydrugs<-subset(tidy.drugdata,site=="GFVN")
+GFVN.zeros<-GFVN.tidydrugs
+GFVN.zeros[is.na(GFVN.zeros)] = 0
+GFVN.zeros$tot.conc<-rowSums(GFVN.zeros[,3:94],na.rm = T)
+
+GFVN.halfdetect<-GFVN.tidydrugs
+for (i in 3:ncol(GFVN.halfdetect)){
+  GFVN.halfdetect[,i]<-replace_na(GFVN.halfdetect[,i], DrugInfo[i-2,'LOQ']/2)
+}
+GFVN.halfdetect$tot.conc<-rowSums(GFVN.halfdetect[,3:94],na.rm = T)
+
+GFVN.mixed<-GFVN.tidydrugs
+for (i in 3:ncol(GFVN.mixed)){
+  GFVN.mixed[base::sample(which(is.na(GFVN.mixed[,i])),size=0.5*length(which(is.na(GFVN.mixed[,i])))),i]<-0
+    
+  GFVN.mixed[,i]<-replace_na(GFVN.mixed[,i], DrugInfo[i-2,'LOQ']/2)
+}
+GFVN.mixed$tot.conc<-rowSums(GFVN.mixed[,3:94],na.rm = T)
+
+
+#############################
+### Resampling approaches ###
+#############################
+
+# re-sample from each of these types for each drug and apply them to the discharge time-series
+
+#Set up the function "estimate load", which takes the inputs "site.type.drug" (a vector) specifying which site, the type of estimation for BDL data, and which drug (e.g. "GFVN.zeros$tot.conc") and the site-specific, gap-filled Q timeseries (a vector, e.g. "GFVN.Q.seq")
+estimate.load<- function(site.type.drug,Q.seq){ 
+  sample<-base::sample(site.type.drug,size = nrow(Q.seq),replace = T) # this part randomly samples from the concentrations, with replacement, and applies them to the discharge timeseries
+  tot.load<-sum(sample*Q.seq$Q_Ls*300)/1e+09 # this part multiplies concentration by discharge and sums over the discharge time series to give a total load in grams
+  return(tot.load)
+}
+
+### NOW, apply a bootstrap, and repeat it for each drug and each type of estimation
+
+runs<-10000
+
+cl <- makeCluster(3)
+registerDoParallel(cl)  # initiate the cluster to run in parallel
+
+#GFVN.zeros.MC<-list()
+#for (i in 3:ncol(GFVN.zeros)){
+#  GFVN.zeros.MC[[i-2]]<-replicate(runs,estimate.load(GFVN.zeros[,i],GFVN.Q.seq))
+#}
+#names(GFVN.zeros.MC)<-colnames(GFVN.zeros)[3:ncol(GFVN.zeros)]
+
+GFVN.zeros.MC <- foreach(i=3:ncol(GFVN.zeros), .combine = "cbind.data.frame") %dopar% { 
+  replicate(runs,estimate.load(GFVN.zeros[,i],GFVN.Q.seq))
+}
+names(GFVN.zeros.MC)<-colnames(GFVN.zeros)[3:ncol(GFVN.zeros)]
+# write.csv(GFVN.zeros.MC,'GFVN.bootstrappedfluxes.zeros.csv',row.names = F)
+
+# mean(GFVN.zeros.MC$Amytriptyline)*(1000/75)+mean(GFVN.zeros.MC$Mianserin)*(1000/60)+mean(GFVN.zeros.MC$Duloxetine)*(1000/60)+mean(GFVN.zeros.MC$Sertraline)*(1000/50)    is the equivalent of total antidepressants discharged (5373)
+# CI((GFVN.zeros.MC$Amytriptyline+GFVN.zeros.MC$Mianserin+GFVN.zeros.MC$Duloxetine+GFVN.zeros.MC$Sertraline),ci=0.95) = [359.70, 360.14], mean = 359.92 g
+
+# mean(GFVN.zeros.MC$Ofloxacin)*(1000/400)+mean(GFVN.zeros.MC$Trimethoprim)*(1000/400)+mean(GFVN.zeros.MC$Clarithromycin)+mean(GFVN.zeros.MC$Roxithromycin)*(1000/300)    is the equivalent of total antibiotics doses discharged (409.90)
+# CI((GFVN.zeros.MC$Ofloxacin+GFVN.zeros.MC$Trimethoprim+GFVN.zeros.MC$Clarithromycin+GFVN.zeros.MC$Roxithromycin),ci=0.95) = [179.88, 180.06], mean = 179.97 g
+
+# mean(GFVN.zeros.MC$Cilazapril)*(1000/2.5)+mean(GFVN.zeros.MC$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin drugs discharged (14052)
+# CI((GFVN.zeros.MC$Cilazapril+GFVN.zeros.MC$Irbesartan),ci=0.95) = [557.92, 558.94], mean = 558.43 g
+
+GFVN.halfdetect.MC <- foreach(i=3:ncol(GFVN.halfdetect), .combine = "cbind.data.frame") %dopar% { 
+  replicate(runs,estimate.load(GFVN.halfdetect[,i],GFVN.Q.seq))
+}
+names(GFVN.halfdetect.MC)<-colnames(GFVN.halfdetect)[3:ncol(GFVN.halfdetect)]
+# write.csv(GFVN.halfdetect.MC,'GFVN.bootstrappedfluxes.halfdetect.csv',row.names = F)
+
+# mean(GFVN.halfdetect.MC$Amytriptyline)*(1000/75)+mean(GFVN.halfdetect.MC$Mianserin)*(1000/60)+mean(GFVN.halfdetect.MC$Duloxetine)*(1000/60)+mean(GFVN.halfdetect.MC$Sertraline)*(1000/50)    is the equivalent of total antidepressants discharged (17705)
+# CI((GFVN.halfdetect.MC$Amytriptyline+GFVN.halfdetect.MC$Mianserin+GFVN.halfdetect.MC$Duloxetine+GFVN.halfdetect.MC$Sertraline),ci=0.95) = [1098.36, 1098.77], mean = 1098.57 g
+
+# mean(GFVN.halfdetect.MC$Ofloxacin)*(1000/400)+mean(GFVN.halfdetect.MC$Trimethoprim)*(1000/400)+mean(GFVN.halfdetect.MC$Clarithromycin)+mean(GFVN.halfdetect.MC$Roxithromycin)*(1000/300)    is the equivalent of total antibiotics doses discharged (2404.83)
+# CI((GFVN.halfdetect.MC$Ofloxacin+GFVN.halfdetect.MC$Trimethoprim+GFVN.halfdetect.MC$Clarithromycin+GFVN.halfdetect.MC$Roxithromycin),ci=0.95) = [881.21, 881.36], mean = 881.29 g
+
+# mean(GFVN.halfdetect.MC$Cilazapril)*(1000/2.5)+mean(GFVN.halfdetect.MC$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin drugs discharged (36122)
+# CI((GFVN.halfdetect.MC$Cilazapril+GFVN.halfdetect.MC$Irbesartan),ci=0.95) = [690.18, 691.22], mean = 690.70 g
+
+GFVN.mixed.MC <- foreach(i=3:ncol(GFVN.mixed), .combine = "cbind.data.frame") %dopar% { 
+  replicate(runs,estimate.load(GFVN.mixed[,i],GFVN.Q.seq))
+}
+names(GFVN.mixed.MC)<-colnames(GFVN.mixed)[3:ncol(GFVN.mixed)]
+# write.csv(GFVN.mixed.MC,'GFVN.bootstrappedfluxes.mixed.csv',row.names = F)
+
+# mean(GFVN.mixed.MC$Amytriptyline)*(1000/75)+mean(GFVN.mixed.MC$Mianserin)*(1000/60)+mean(GFVN.mixed.MC$Duloxetine)*(1000/60)+mean(GFVN.mixed.MC$Sertraline)*(1000/50)    is the equivalent of total antidepressants discharged (11601)
+# CI((GFVN.mixed.MC$Amytriptyline+GFVN.mixed.MC$Mianserin+GFVN.mixed.MC$Duloxetine+GFVN.mixed.MC$Sertraline),ci=0.95) = [733.44, 733.88], mean = 733.66 g
+
+# mean(GFVN.mixed.MC$Ofloxacin)*(1000/400)+mean(GFVN.mixed.MC$Trimethoprim)*(1000/400)+mean(GFVN.mixed.MC$Clarithromycin)+mean(GFVN.mixed.MC$Roxithromycin)*(1000/300)    is the equivalent of total antibiotics doses discharged (1412.23)
+# CI((GFVN.mixed.MC$Ofloxacin+GFVN.mixed.MC$Trimethoprim+GFVN.mixed.MC$Clarithromycin+GFVN.mixed.MC$Roxithromycin),ci=0.95) = [532.46, 532.65], mean = 532.55 g
+
+# mean(GFVN.mixed.MC$Cilazapril)*(1000/2.5)+mean(GFVN.mixed.MC$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin drugs discharged (25351)
+# CI((GFVN.mixed.MC$Cilazapril+GFVN.mixed.MC$Irbesartan),ci=0.95) = [624.23, 625.27], mean = 624.23 g
+
+
+#stopCluster(cl)
+
+#############################################
+### Interpolated concentration approaches ###
+#############################################
+
+GFVN.datetime<-data.frame(date=as_date(GFVN.datetime),datetime=GFVN.datetime,round.datetime=ymd_hms(round_date(GFVN.datetime,unit="5 mins"))) # make the datetime round to match with the Q timeseries
+GFVN.Q.seq$DateTime<-ymd_hms(GFVN.Q.seq$DateTime)
+
+
+GFVN.zeros.dt<-left_join(GFVN.zeros,GFVN.datetime,by='date') #join the times to the conc
+GFVN.zeros.interpload<-left_join(GFVN.Q.seq,GFVN.zeros.dt,by=c('DateTime'='round.datetime'))
+for (i in 10:101){
+  GFVN.zeros.interpload[1:110,i]<-GFVN.zeros.interpload[111,i]
+  GFVN.zeros.interpload[,i]<-na.approx( GFVN.zeros.interpload[,i],na.rm = F) #linearly interpolate concentrations
+  GFVN.zeros.interpload[104947:nrow(GFVN.zeros.interpload),i]<-GFVN.zeros.dt[46,i-7]
+}
+GFVN.zeros.interpload$tot.conc<-rowSums(GFVN.zeros.interpload[,10:101])
+
+GFVN.zeros.interp.annual<-data.frame(matrix(ncol = 93, nrow = 1))
+names(GFVN.zeros.interp.annual)<-names(GFVN.zeros.interpload)[10:102]
+for (i in 1:ncol(GFVN.zeros.interp.annual)){
+  GFVN.zeros.interp.annual[1,i]<-sum(GFVN.zeros.interpload['Q_Ls']*GFVN.zeros.interpload[,i+9]*300/1e+09)
+}
+
+# mean(GFVN.zeros.interp.annual$Amytriptyline)*(1000/75)+mean(GFVN.zeros.interp.annual$Mianserin)*(1000/60)+mean(GFVN.zeros.interp.annual$Duloxetine)*(1000/60)+mean(GFVN.zeros.interp.annual$Sertraline)*(1000/50)    is the equivalent of total antidepressants discharged (2665.52)
+# GFVN.zeros.interp.annual$Amytriptyline+GFVN.zeros.interp.annual$Mianserin+GFVN.zeros.interp.annual$Duloxetine+GFVN.zeros.interp.annual$Sertraline = 180.56 g
+
+# mean(GFVN.zeros.interp.annual$Ofloxacin)*(1000/400)+mean(GFVN.zeros.interp.annual$Trimethoprim)*(1000/400)+mean(GFVN.zeros.interp.annual$Clarithromycin)+mean(GFVN.zeros.interp.annual$Roxithromycin)*(1000/300)    is the equivalent of total antibiotics doses discharged (356.89)
+# GFVN.zeros.interp.annual$Ofloxacin+GFVN.zeros.interp.annual$Trimethoprim+GFVN.zeros.interp.annual$Clarithromycin+GFVN.zeros.interp.annual$Roxithromycin = 144.14 g
+
+# mean(GFVN.zeros.interp.annual$Cilazapril)*(1000/2.5)+mean(GFVN.zeros.interp.annual$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin drugs discharged (4798.59)
+# GFVN.zeros.interp.annual$Cilazapril+GFVN.zeros.interp.annual$Irbesartan = 166.111 g
+
+GFVN.halfdetect.dt<-left_join(GFVN.halfdetect,GFVN.datetime,by='date') #join the times to the conc
+GFVN.halfdetect.interpload<-left_join(GFVN.Q.seq,GFVN.halfdetect.dt,by=c('DateTime'='round.datetime'))
+for (i in 10:101){
+  GFVN.halfdetect.interpload[1:110,i]<-GFVN.halfdetect.interpload[111,i]
+  GFVN.halfdetect.interpload[,i]<-na.approx( GFVN.halfdetect.interpload[,i],na.rm = F) #linearly interpolate concentrations
+  GFVN.halfdetect.interpload[104947:nrow(GFVN.halfdetect.interpload),i]<-GFVN.halfdetect.dt[46,i-7]
+}
+GFVN.halfdetect.interpload$tot.conc<-rowSums(GFVN.halfdetect.interpload[,10:101])
+
+GFVN.halfdetect.interp.annual<-data.frame(matrix(ncol = 93, nrow = 1))
+names(GFVN.halfdetect.interp.annual)<-names(GFVN.halfdetect.interpload)[10:102]
+for (i in 1:ncol(GFVN.halfdetect.interp.annual)){
+  GFVN.halfdetect.interp.annual[1,i]<-sum(GFVN.halfdetect.interpload['Q_Ls']*GFVN.halfdetect.interpload[,i+9]*300/1e+09)
+}
+
+GFVN.interp<-rbind(GFVN.zeros.interp.annual,GFVN.halfdetect.interp.annual)
+GFVN.interp$method<-c("zeros","halfdetect")
+write.csv(GFVN.interp,"GFVN.interp.csv",row.names = F)
+
+# mean(GFVN.halfdetect.interp.annual$Amytriptyline)*(1000/75)+mean(GFVN.halfdetect.interp.annual$Mianserin)*(1000/60)+mean(GFVN.halfdetect.interp.annual$Duloxetine)*(1000/60)+mean(GFVN.halfdetect.interp.annual$Sertraline)*(1000/50)    is the equivalent of total antidepressants discharged (15232)
+# GFVN.halfdetect.interp.annual$Amytriptyline+GFVN.halfdetect.interp.annual$Mianserin+GFVN.halfdetect.interp.annual$Duloxetine+GFVN.halfdetect.interp.annual$Sertraline = 933.07 g
+
+# mean(GFVN.halfdetect.interp.annual$Ofloxacin)*(1000/400)+mean(GFVN.halfdetect.interp.annual$Trimethoprim)*(1000/400)+mean(GFVN.halfdetect.interp.annual$Clarithromycin)+mean(GFVN.halfdetect.interp.annual$Roxithromycin)*(1000/300)    is the equivalent of total antibiotics doses discharged (2369.624)
+# GFVN.halfdetect.interp.annual$Ofloxacin+GFVN.halfdetect.interp.annual$Trimethoprim+GFVN.halfdetect.interp.annual$Clarithromycin+GFVN.halfdetect.interp.annual$Roxithromycin = 851.97 g
+
+# mean(GFVN.halfdetect.interp.annual$Cilazapril)*(1000/2.5)+mean(GFVN.halfdetect.interp.annual$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin drugs discharged (28979)
+# GFVN.halfdetect.interp.annual$Cilazapril+GFVN.halfdetect.interp.annual$Irbesartan = 306.9 g
+
+### For the mixed approach, it matters which values end up where, so we'll use a resampling approach here:
+
+GFVN.mixed.list<-replicate(10000,GFVN.tidydrugs,simplify=F)
+ for (i in 1:length(GFVN.mixed.list)){
+  foo<-GFVN.mixed.list[[i]]
+  for (j in 3:ncol(GFVN.tidydrugs)){
+    foo[base::sample(which(is.na(foo[,j])),size=0.5*length(which(is.na(foo[,j])))),j]<-0
+    foo[,j]<-replace_na(foo[,j], DrugInfo[j-2,'LOQ']/2)
+  }
+  GFVN.mixed.list[[i]]<-left_join(foo,GFVN.datetime,by='date')
+}
+
+GFVN.mixed.interp.MC <- data.frame(matrix(ncol = 92, nrow = 10000))
+colnames(GFVN.mixed.interp.MC) <- colnames(GFVN.tidydrugs)[3:94]
+
+for (i in 1:length(GFVN.mixed.list)){
+  mango<-left_join(GFVN.Q.seq,GFVN.mixed.list[[i]],by=c('DateTime'='round.datetime'))
+   for (j in 1:92){
+      mango[1:110,j+9]<-mango[111,j+9]
+      mango[,j+9]<-na.approx(mango[,j+9],na.rm = F) #linearly interpolate concentrations
+      mango[104947:nrow(mango),j+9]<-mango[104946,j+9]  # now we have a dataframe for the interpolated concentrations of each drug over the Q timeseries, so we multiply each drug by Q and sum it to get annual flux, then and save each interaction in its own row of a dataframe
+      GFVN.mixed.interp.MC[i,j]<-sum(mango['Q_Ls']*mango[,j+9]*300/1e+09)
+     
+  }
+}  
+write.csv(GFVN.mixed.interp.MC,"GFVN.mixed_interpolation.BootstrapResults.csv",row.names = F)
+  
+# mean(GFVN.mixed.interp.MC$Amytriptyline)*(1000/75)+mean(GFVN.mixed.interp.MC$Mianserin)*(1000/60)+mean(GFVN.mixed.interp.MC$Duloxetine)*(1000/60)+mean(GFVN.mixed.interp.MC$Sertraline)*(1000/50)    is the equivalent of total antidepressants discharged (9008)
+# CI(GFVN.mixed.interp.MC$Amytriptyline+GFVN.mixed.interp.MC$Mianserin+GFVN.mixed.interp.MC$Duloxetine+GFVN.mixed.interp.MC$Sertraline,ci=0.95) = [560.323, 561.970], mean = 561.147 g
+
+# mean(GFVN.mixed.interp.MC$Ofloxacin)*(1000/400)+mean(GFVN.mixed.interp.MC$Trimethoprim)*(1000/400)+mean(GFVN.mixed.interp.MC$Clarithromycin)+mean(GFVN.mixed.interp.MC$Roxithromycin)*(1000/300)    is the equivalent of total antibiotics doses discharged (1366)
+# CI(GFVN.mixed.interp.MC$Ofloxacin+GFVN.mixed.interp.MC$Trimethoprim+GFVN.mixed.interp.MC$Clarithromycin+GFVN.mixed.interp.MC$Roxithromycin, ci=0.95) = [598.52, 500.31], mean = 499.42 g
+
+# mean(GFVN.mixed.interp.MC$Cilazapril)*(1000/2.5)+mean(GFVN.mixed.interp.MC$Irbesartan)*(1000/150)    is the equivalent of total renin-angiotensin drugs discharged (17232)
+# CI(GFVN.mixed.interp.MC$Cilazapril+GFVN.mixed.interp.MC$Irbesartan,ci=0.95) = [237.12, 237.52], mean = 237.32 g
+
+```
+
+
+```{r PER CAPITA FLUXES, Influent and Effluent comparisons}
+
+###############################################################################################
+### Per capita estimates and comparison to WWTP effluent from Verlecchi et al. 2012 STOTEN: ###
+###############################################################################################
+
+# divide calculated annual loads of each of the drugs in the Verlicchi list by the watershed pop and by 365 days to get loads in units of mg*1000 inhabitants^-1*day^-1  (remember to convert to mg from g)
+
+# Store the IDs of detected compoounds for each site in a list
+detect.list<-list(GFCP.sub.names,GFVN.sub.names,GFGB.sub.names,GFGL.sub.names,POBR.sub.names,BARN.sub.names,DRKR.sub.names)
+names(detect.list)<-c("GFCP",
+                      "GFVN",
+                      "GFGB",
+                      "GFGL",
+                      "POBR",
+                      "BARN",
+                      "DRKR")
+
+### Bootstrap methods
+CP.zerosboot.VerlicchiLoads<-data.frame(Pharmaceutical = VerlicchiLoads$Pharmaceutical, mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)))
+
+for (i in 1:nrow(VerlicchiLoads)){
+  if (VerlicchiLoads$Pharmaceutical[i] %in% detect.list[["GFCP"]] == T) {
+   CP.zerosboot.VerlicchiLoads$mg.1000inhab.d[i]<- mean(GFCP.zeros.boot[,which(names(GFCP.zeros.boot)==VerlicchiLoads$Pharmaceutical[i])])*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Carroll Park")]/1000)
+  }
+  else {CP.zerosboot.VerlicchiLoads$mg.1000inhab.d[i]<-NA}
+}
+
+
+GFCP.zeros.boot<-read.csv('GFCP.bootstrappedfluxes.zeros.csv',header = T)
+GFCP.halfdetect.boot<-read.csv('GFCP.bootstrappedfluxes.halfdetect.csv',header = T)
+GFCP.mixed.boot<-read.csv('GFCP.bootstrappedfluxes.mixed.csv',header = T)
+
+GFVN.zeros.boot<-read.csv('GFVN.bootstrappedfluxes.zeros.csv',header = T)
+GFVN.halfdetect.boot<-read.csv('GFVN.bootstrappedfluxes.halfdetect.csv',header = T)
+GFVN.mixed.boot<-read.csv('GFVN.bootstrappedfluxes.mixed.csv',header = T)
+
+GFGB.zeros.boot<-read.csv('GFGB.bootstrappedfluxes.zeros.csv',header = T)
+GFGB.halfdetect.boot<-read.csv('GFGB.bootstrappedfluxes.halfdetect.csv',header = T)
+GFGB.mixed.boot<-read.csv('GFGB.bootstrappedfluxes.mixed.csv',header = T)
+
+GFGL.zeros.boot<-read.csv('GFGL.bootstrappedfluxes.zeros.csv',header = T)
+GFGL.halfdetect.boot<-read.csv('GFGL.bootstrappedfluxes.halfdetect.csv',header = T)
+GFGL.mixed.boot<-read.csv('GFGL.bootstrappedfluxes.mixed.csv',header = T)
+
+POBR.zeros.boot<-read.csv('POBR.bootstrappedfluxes.zeros.csv',header = T)
+POBR.halfdetect.boot<-read.csv('POBR.bootstrappedfluxes.halfdetect.csv',header = T)
+POBR.mixed.boot<-read.csv('POBR.bootstrappedfluxes.mixed.csv',header = T)
+
+BARN.zeros.boot<-read.csv('BARN.bootstrappedfluxes.zeros.csv',header = T)
+BARN.halfdetect.boot<-read.csv('BARN.bootstrappedfluxes.halfdetect.csv',header = T)
+BARN.mixed.boot<-read.csv('BARN.bootstrappedfluxes.mixed.csv',header = T)
+
+DRKR.zeros.boot<-read.csv('DRKR.bootstrappedfluxes.zeros.csv',header = T)
+DRKR.halfdetect.boot<-read.csv('DRKR.bootstrappedfluxes.halfdetect.csv',header = T)
+DRKR.mixed.boot<-read.csv('DRKR.bootstrappedfluxes.mixed.csv',header = T)
+
+#Interpolation results:
+GFCP.mixed.interp<-read.csv('GFCP.mixed_interpolation.BootstrapResults.csv',header = T)
+GFCP.interp<-read.csv('GFCP.interp.csv',header=T)
+
+GFVN.mixed.interp<-read.csv('GFVN.mixed_interpolation.BootstrapResults.csv',header = T)
+GFVN.interp<-read.csv('GFVN.interp.csv',header=T)
+
+GFGB.mixed.interp<-read.csv('GFGB.mixed_interpolation.BootstrapResults.csv',header = T)
+GFGB.interp<-read.csv('GFGB.interp.csv',header=T)
+
+GFGL.mixed.interp<-read.csv('GFGL.mixed_interpolation.BootstrapResults.csv',header = T)
+GFGL.interp<-read.csv('GFGL.interp.csv',header=T)
+
+POBR.mixed.interp<-read.csv('POBR.mixed_interpolation.BootstrapResults.csv',header = T)
+POBR.interp<-read.csv('POBR.interp.csv',header=T)
+
+BARN.mixed.interp<-read.csv('BARN.mixed_interpolation.BootstrapResults.csv',header = T)
+BARN.interp<-read.csv('BARN.interp.csv',header=T)
+
+DRKR.mixed.interp<-read.csv('DRKR.mixed_interpolation.BootstrapResults.csv',header = T)
+DRKR.interp<-read.csv('DRKR.interp.csv',header=T)
+
+
+### Interpolation methods
+
+
+
+
 
 
 ```
