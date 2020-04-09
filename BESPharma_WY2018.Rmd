@@ -2497,73 +2497,131 @@ names(detect.list)<-c("GFCP",
                       "BARN",
                       "DRKR")
 
-### Bootstrap methods
-CP.zerosboot.VerlicchiLoads<-data.frame(Pharmaceutical = VerlicchiLoads$Pharmaceutical, mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)))
+### Carroll Park
+CP.VerlicchiLoads<-data.frame(Pharmaceutical = VerlicchiLoads$Pharmaceutical, ZerosBoot.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),HalfBoot.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),MixedBoot.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),ZerosInterp.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),HalfInterp.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),MixedInterp.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)))
 
 for (i in 1:nrow(VerlicchiLoads)){
   if (VerlicchiLoads$Pharmaceutical[i] %in% detect.list[["GFCP"]] == T) {
-   CP.zerosboot.VerlicchiLoads$mg.1000inhab.d[i]<- mean(GFCP.zeros.boot[,which(names(GFCP.zeros.boot)==VerlicchiLoads$Pharmaceutical[i])])*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Carroll Park")]/1000)
+      CP.VerlicchiLoads$ZerosBoot.mg.1000inhab.d[i]<-   mean(GFCP.zeros.boot[,which(names(GFCP.zeros.boot)==VerlicchiLoads$Pharmaceutical[i])])*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Carroll Park")]/1000)
+      CP.VerlicchiLoads$HalfBoot.mg.1000inhab.d[i]<- mean(GFCP.halfdetect.boot[,which(names(GFCP.halfdetect.boot)==VerlicchiLoads$Pharmaceutical[i])])*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Carroll Park")]/1000)
+      CP.VerlicchiLoads$MixedBoot.mg.1000inhab.d[i]<- mean(GFCP.zeros.boot[,which(names(GFCP.mixed.boot)==VerlicchiLoads$Pharmaceutical[i])])*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Carroll Park")]/1000)
+      CP.VerlicchiLoads$ZerosInterp.mg.1000inhab.d[i]<- GFCP.interp[which(GFCP.interp$method=="zeros"),which(names(GFCP.interp)==VerlicchiLoads$Pharmaceutical[i])]*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Carroll Park")]/1000)
+      CP.VerlicchiLoads$HalfInterp.mg.1000inhab.d[i]<- GFCP.interp[which(GFCP.interp$method=="halfdetect"),which(names(GFCP.interp)==VerlicchiLoads$Pharmaceutical[i])]*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Carroll Park")]/1000)
+      CP.VerlicchiLoads$MixedInterp.mg.1000inhab.d[i]<- mean(GFCP.mixed.interp[,which(names(GFCP.mixed.interp)==VerlicchiLoads$Pharmaceutical[i])])*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Carroll Park")]/1000)
+   
   }
-  else {CP.zerosboot.VerlicchiLoads$mg.1000inhab.d[i]<-NA}
+  else {CP.VerlicchiLoads[i,2:7]<-NA}
 }
 
+write.csv(CP.VerlicchiLoads,"GFCP.PerCap.csv",row.names = F)
 
-GFCP.zeros.boot<-read.csv('GFCP.bootstrappedfluxes.zeros.csv',header = T)
-GFCP.halfdetect.boot<-read.csv('GFCP.bootstrappedfluxes.halfdetect.csv',header = T)
-GFCP.mixed.boot<-read.csv('GFCP.bootstrappedfluxes.mixed.csv',header = T)
+### Villa Nova
+GFVN.VerlicchiLoads<-data.frame(Pharmaceutical = VerlicchiLoads$Pharmaceutical, ZerosBoot.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),HalfBoot.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),MixedBoot.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),ZerosInterp.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),HalfInterp.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),MixedInterp.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)))
 
-GFVN.zeros.boot<-read.csv('GFVN.bootstrappedfluxes.zeros.csv',header = T)
-GFVN.halfdetect.boot<-read.csv('GFVN.bootstrappedfluxes.halfdetect.csv',header = T)
-GFVN.mixed.boot<-read.csv('GFVN.bootstrappedfluxes.mixed.csv',header = T)
+for (i in 1:nrow(VerlicchiLoads)){
+  if (VerlicchiLoads$Pharmaceutical[i] %in% detect.list[["GFVN"]] == T) {
+      GFVN.VerlicchiLoads$ZerosBoot.mg.1000inhab.d[i]<-   mean(GFVN.zeros.boot[,which(names(GFVN.zeros.boot)==VerlicchiLoads$Pharmaceutical[i])])*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Villa Nova")]/1000)
+      GFVN.VerlicchiLoads$HalfBoot.mg.1000inhab.d[i]<- mean(GFVN.halfdetect.boot[,which(names(GFVN.halfdetect.boot)==VerlicchiLoads$Pharmaceutical[i])])*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Villa Nova")]/1000)
+      GFVN.VerlicchiLoads$MixedBoot.mg.1000inhab.d[i]<- mean(GFVN.zeros.boot[,which(names(GFVN.mixed.boot)==VerlicchiLoads$Pharmaceutical[i])])*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Villa Nova")]/1000)
+      GFVN.VerlicchiLoads$ZerosInterp.mg.1000inhab.d[i]<- GFVN.interp[which(GFVN.interp$method=="zeros"),which(names(GFVN.interp)==VerlicchiLoads$Pharmaceutical[i])]*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Villa Nova")]/1000)
+      GFVN.VerlicchiLoads$HalfInterp.mg.1000inhab.d[i]<- GFVN.interp[which(GFVN.interp$method=="halfdetect"),which(names(GFVN.interp)==VerlicchiLoads$Pharmaceutical[i])]*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Villa Nova")]/1000)
+      GFVN.VerlicchiLoads$MixedInterp.mg.1000inhab.d[i]<- mean(GFVN.mixed.interp[,which(names(GFVN.mixed.interp)==VerlicchiLoads$Pharmaceutical[i])])*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Villa Nova")]/1000)
+   
+  }
+  else {GFVN.VerlicchiLoads[i,2:7]<-NA}
+}
 
-GFGB.zeros.boot<-read.csv('GFGB.bootstrappedfluxes.zeros.csv',header = T)
-GFGB.halfdetect.boot<-read.csv('GFGB.bootstrappedfluxes.halfdetect.csv',header = T)
-GFGB.mixed.boot<-read.csv('GFGB.bootstrappedfluxes.mixed.csv',header = T)
+write.csv(GFVN.VerlicchiLoads,"GFVN.PerCap.csv",row.names = F)
 
-GFGL.zeros.boot<-read.csv('GFGL.bootstrappedfluxes.zeros.csv',header = T)
-GFGL.halfdetect.boot<-read.csv('GFGL.bootstrappedfluxes.halfdetect.csv',header = T)
-GFGL.mixed.boot<-read.csv('GFGL.bootstrappedfluxes.mixed.csv',header = T)
+### Gwynnbrook
+GFGB.VerlicchiLoads<-data.frame(Pharmaceutical = VerlicchiLoads$Pharmaceutical, ZerosBoot.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),HalfBoot.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),MixedBoot.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),ZerosInterp.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),HalfInterp.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),MixedInterp.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)))
 
-POBR.zeros.boot<-read.csv('POBR.bootstrappedfluxes.zeros.csv',header = T)
-POBR.halfdetect.boot<-read.csv('POBR.bootstrappedfluxes.halfdetect.csv',header = T)
-POBR.mixed.boot<-read.csv('POBR.bootstrappedfluxes.mixed.csv',header = T)
+for (i in 1:nrow(VerlicchiLoads)){
+  if (VerlicchiLoads$Pharmaceutical[i] %in% detect.list[["GFGB"]] == T) {
+      GFGB.VerlicchiLoads$ZerosBoot.mg.1000inhab.d[i]<-   mean(GFGB.zeros.boot[,which(names(GFGB.zeros.boot)==VerlicchiLoads$Pharmaceutical[i])])*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Gwynnbrook")]/1000)
+      GFGB.VerlicchiLoads$HalfBoot.mg.1000inhab.d[i]<- mean(GFGB.halfdetect.boot[,which(names(GFGB.halfdetect.boot)==VerlicchiLoads$Pharmaceutical[i])])*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Gwynnbrook")]/1000)
+      GFGB.VerlicchiLoads$MixedBoot.mg.1000inhab.d[i]<- mean(GFGB.zeros.boot[,which(names(GFGB.mixed.boot)==VerlicchiLoads$Pharmaceutical[i])])*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Gwynnbrook")]/1000)
+      GFGB.VerlicchiLoads$ZerosInterp.mg.1000inhab.d[i]<- GFGB.interp[which(GFGB.interp$method=="zeros"),which(names(GFGB.interp)==VerlicchiLoads$Pharmaceutical[i])]*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Gwynnbrook")]/1000)
+      GFGB.VerlicchiLoads$HalfInterp.mg.1000inhab.d[i]<- GFGB.interp[which(GFGB.interp$method=="halfdetect"),which(names(GFGB.interp)==VerlicchiLoads$Pharmaceutical[i])]*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Gwynnbrook")]/1000)
+      GFGB.VerlicchiLoads$MixedInterp.mg.1000inhab.d[i]<- mean(GFGB.mixed.interp[,which(names(GFGB.mixed.interp)==VerlicchiLoads$Pharmaceutical[i])])*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Gwynnbrook")]/1000)
+   
+  }
+  else {GFGB.VerlicchiLoads[i,2:7]<-NA}
+}
 
-BARN.zeros.boot<-read.csv('BARN.bootstrappedfluxes.zeros.csv',header = T)
-BARN.halfdetect.boot<-read.csv('BARN.bootstrappedfluxes.halfdetect.csv',header = T)
-BARN.mixed.boot<-read.csv('BARN.bootstrappedfluxes.mixed.csv',header = T)
+write.csv(GFGB.VerlicchiLoads,"GFGB.PerCap.csv",row.names = F)
 
-DRKR.zeros.boot<-read.csv('DRKR.bootstrappedfluxes.zeros.csv',header = T)
-DRKR.halfdetect.boot<-read.csv('DRKR.bootstrappedfluxes.halfdetect.csv',header = T)
-DRKR.mixed.boot<-read.csv('DRKR.bootstrappedfluxes.mixed.csv',header = T)
+### Glyndon
+GFGL.VerlicchiLoads<-data.frame(Pharmaceutical = VerlicchiLoads$Pharmaceutical, ZerosBoot.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),HalfBoot.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),MixedBoot.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),ZerosInterp.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),HalfInterp.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),MixedInterp.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)))
 
-#Interpolation results:
-GFCP.mixed.interp<-read.csv('GFCP.mixed_interpolation.BootstrapResults.csv',header = T)
-GFCP.interp<-read.csv('GFCP.interp.csv',header=T)
+for (i in 1:nrow(VerlicchiLoads)){
+  if (VerlicchiLoads$Pharmaceutical[i] %in% detect.list[["GFGL"]] == T) {
+      GFGL.VerlicchiLoads$ZerosBoot.mg.1000inhab.d[i]<-   mean(GFGL.zeros.boot[,which(names(GFGL.zeros.boot)==VerlicchiLoads$Pharmaceutical[i])])*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Glyndon")]/1000)
+      GFGL.VerlicchiLoads$HalfBoot.mg.1000inhab.d[i]<- mean(GFGL.halfdetect.boot[,which(names(GFGL.halfdetect.boot)==VerlicchiLoads$Pharmaceutical[i])])*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Glyndon")]/1000)
+      GFGL.VerlicchiLoads$MixedBoot.mg.1000inhab.d[i]<- mean(GFGL.zeros.boot[,which(names(GFGL.mixed.boot)==VerlicchiLoads$Pharmaceutical[i])])*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Glyndon")]/1000)
+      GFGL.VerlicchiLoads$ZerosInterp.mg.1000inhab.d[i]<- GFGL.interp[which(GFGL.interp$method=="zeros"),which(names(GFGL.interp)==VerlicchiLoads$Pharmaceutical[i])]*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Glyndon")]/1000)
+      GFGL.VerlicchiLoads$HalfInterp.mg.1000inhab.d[i]<- GFGL.interp[which(GFGL.interp$method=="halfdetect"),which(names(GFGL.interp)==VerlicchiLoads$Pharmaceutical[i])]*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Glyndon")]/1000)
+      GFGL.VerlicchiLoads$MixedInterp.mg.1000inhab.d[i]<- mean(GFGL.mixed.interp[,which(names(GFGL.mixed.interp)==VerlicchiLoads$Pharmaceutical[i])])*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Glyndon")]/1000)
+   
+  }
+  else {GFGL.VerlicchiLoads[i,2:7]<-NA}
+}
 
-GFVN.mixed.interp<-read.csv('GFVN.mixed_interpolation.BootstrapResults.csv',header = T)
-GFVN.interp<-read.csv('GFVN.interp.csv',header=T)
+write.csv(GFGL.VerlicchiLoads,"GFGL.PerCap.csv",row.names = F)
 
-GFGB.mixed.interp<-read.csv('GFGB.mixed_interpolation.BootstrapResults.csv',header = T)
-GFGB.interp<-read.csv('GFGB.interp.csv',header=T)
+### Pond Branch
+POBR.VerlicchiLoads<-data.frame(Pharmaceutical = VerlicchiLoads$Pharmaceutical, ZerosBoot.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),HalfBoot.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),MixedBoot.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),ZerosInterp.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),HalfInterp.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),MixedInterp.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)))
 
-GFGL.mixed.interp<-read.csv('GFGL.mixed_interpolation.BootstrapResults.csv',header = T)
-GFGL.interp<-read.csv('GFGL.interp.csv',header=T)
+for (i in 1:nrow(VerlicchiLoads)){
+  if (VerlicchiLoads$Pharmaceutical[i] %in% detect.list[["POBR"]] == T) {
+      POBR.VerlicchiLoads$ZerosBoot.mg.1000inhab.d[i]<-   mean(POBR.zeros.boot[,which(names(POBR.zeros.boot)==VerlicchiLoads$Pharmaceutical[i])])*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Pond Branch")]/1000)
+      POBR.VerlicchiLoads$HalfBoot.mg.1000inhab.d[i]<- mean(POBR.halfdetect.boot[,which(names(POBR.halfdetect.boot)==VerlicchiLoads$Pharmaceutical[i])])*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Pond Branch")]/1000)
+      POBR.VerlicchiLoads$MixedBoot.mg.1000inhab.d[i]<- mean(POBR.zeros.boot[,which(names(POBR.mixed.boot)==VerlicchiLoads$Pharmaceutical[i])])*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Pond Branch")]/1000)
+      POBR.VerlicchiLoads$ZerosInterp.mg.1000inhab.d[i]<- POBR.interp[which(POBR.interp$method=="zeros"),which(names(POBR.interp)==VerlicchiLoads$Pharmaceutical[i])]*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Pond Branch")]/1000)
+      POBR.VerlicchiLoads$HalfInterp.mg.1000inhab.d[i]<- POBR.interp[which(POBR.interp$method=="halfdetect"),which(names(POBR.interp)==VerlicchiLoads$Pharmaceutical[i])]*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Pond Branch")]/1000)
+      POBR.VerlicchiLoads$MixedInterp.mg.1000inhab.d[i]<- mean(POBR.mixed.interp[,which(names(POBR.mixed.interp)==VerlicchiLoads$Pharmaceutical[i])])*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Pond Branch")]/1000)
+   
+  }
+  else {POBR.VerlicchiLoads[i,2:7]<-NA}
+}
 
-POBR.mixed.interp<-read.csv('POBR.mixed_interpolation.BootstrapResults.csv',header = T)
-POBR.interp<-read.csv('POBR.interp.csv',header=T)
+write.csv(POBR.VerlicchiLoads,"POBR.PerCap.csv",row.names = F)
 
-BARN.mixed.interp<-read.csv('BARN.mixed_interpolation.BootstrapResults.csv',header = T)
-BARN.interp<-read.csv('BARN.interp.csv',header=T)
+### Baisman Run
+BARN.VerlicchiLoads<-data.frame(Pharmaceutical = VerlicchiLoads$Pharmaceutical, ZerosBoot.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),HalfBoot.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),MixedBoot.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),ZerosInterp.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),HalfInterp.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),MixedInterp.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)))
 
-DRKR.mixed.interp<-read.csv('DRKR.mixed_interpolation.BootstrapResults.csv',header = T)
-DRKR.interp<-read.csv('DRKR.interp.csv',header=T)
+for (i in 1:nrow(VerlicchiLoads)){
+  if (VerlicchiLoads$Pharmaceutical[i] %in% detect.list[["BARN"]] == T) {
+      BARN.VerlicchiLoads$ZerosBoot.mg.1000inhab.d[i]<-   mean(BARN.zeros.boot[,which(names(BARN.zeros.boot)==VerlicchiLoads$Pharmaceutical[i])])*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Baisman Run")]/1000)
+      BARN.VerlicchiLoads$HalfBoot.mg.1000inhab.d[i]<- mean(BARN.halfdetect.boot[,which(names(BARN.halfdetect.boot)==VerlicchiLoads$Pharmaceutical[i])])*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Baisman Run")]/1000)
+      BARN.VerlicchiLoads$MixedBoot.mg.1000inhab.d[i]<- mean(BARN.zeros.boot[,which(names(BARN.mixed.boot)==VerlicchiLoads$Pharmaceutical[i])])*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Baisman Run")]/1000)
+      BARN.VerlicchiLoads$ZerosInterp.mg.1000inhab.d[i]<- BARN.interp[which(BARN.interp$method=="zeros"),which(names(BARN.interp)==VerlicchiLoads$Pharmaceutical[i])]*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Baisman Run")]/1000)
+      BARN.VerlicchiLoads$HalfInterp.mg.1000inhab.d[i]<- BARN.interp[which(BARN.interp$method=="halfdetect"),which(names(BARN.interp)==VerlicchiLoads$Pharmaceutical[i])]*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Baisman Run")]/1000)
+      BARN.VerlicchiLoads$MixedInterp.mg.1000inhab.d[i]<- mean(BARN.mixed.interp[,which(names(BARN.mixed.interp)==VerlicchiLoads$Pharmaceutical[i])])*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Baisman Run")]/1000)
+   
+  }
+  else {BARN.VerlicchiLoads[i,2:7]<-NA}
+}
 
+write.csv(BARN.VerlicchiLoads,"BARN.PerCap.csv",row.names = F)
 
-### Interpolation methods
+### Dead Run
+DRKR.VerlicchiLoads<-data.frame(Pharmaceutical = VerlicchiLoads$Pharmaceutical, ZerosBoot.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),HalfBoot.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),MixedBoot.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),ZerosInterp.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),HalfInterp.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)),MixedInterp.mg.1000inhab.d = rep(NA,times=nrow(VerlicchiLoads)))
 
+for (i in 1:nrow(VerlicchiLoads)){
+  if (VerlicchiLoads$Pharmaceutical[i] %in% detect.list[["DRKR"]] == T) {
+      DRKR.VerlicchiLoads$ZerosBoot.mg.1000inhab.d[i]<-   mean(DRKR.zeros.boot[,which(names(DRKR.zeros.boot)==VerlicchiLoads$Pharmaceutical[i])])*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Dead Run")]/1000)
+      DRKR.VerlicchiLoads$HalfBoot.mg.1000inhab.d[i]<- mean(DRKR.halfdetect.boot[,which(names(DRKR.halfdetect.boot)==VerlicchiLoads$Pharmaceutical[i])])*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Dead Run")]/1000)
+      DRKR.VerlicchiLoads$MixedBoot.mg.1000inhab.d[i]<- mean(DRKR.zeros.boot[,which(names(DRKR.mixed.boot)==VerlicchiLoads$Pharmaceutical[i])])*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Dead Run")]/1000)
+      DRKR.VerlicchiLoads$ZerosInterp.mg.1000inhab.d[i]<- DRKR.interp[which(DRKR.interp$method=="zeros"),which(names(DRKR.interp)==VerlicchiLoads$Pharmaceutical[i])]*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Dead Run")]/1000)
+      DRKR.VerlicchiLoads$HalfInterp.mg.1000inhab.d[i]<- DRKR.interp[which(DRKR.interp$method=="halfdetect"),which(names(DRKR.interp)==VerlicchiLoads$Pharmaceutical[i])]*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Dead Run")]/1000)
+      DRKR.VerlicchiLoads$MixedInterp.mg.1000inhab.d[i]<- mean(DRKR.mixed.interp[,which(names(DRKR.mixed.interp)==VerlicchiLoads$Pharmaceutical[i])])*1000/365.25/(pops$TotalEstimPop[which(pops$WatershedName=="Dead Run")]/1000)
+   
+  }
+  else {DRKR.VerlicchiLoads[i,2:7]<-NA}
+}
 
-
-
+write.csv(DRKR.VerlicchiLoads,"DRKR.PerCap.csv",row.names = F)
 
 
 ```
